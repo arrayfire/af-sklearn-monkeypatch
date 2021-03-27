@@ -1,0 +1,12 @@
+#targeted classifiers:
+GradientBoosting
+OneHotEncoder
+RandomForest
+SelectFWE
+QuantileTransformer
+ExtraTreesClassifier
+Imputer
+GenericUnivariateSelect
+SGDClassifier
+LinearSVC
+
