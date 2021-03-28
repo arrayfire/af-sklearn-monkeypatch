@@ -6,7 +6,7 @@ import warnings
 import numbers
 from numpy.core.numeric import ComplexWarning
 from inspect import signature, isclass, Parameter
-from .af_type_utils import typemap
+from ._type_utils import typemap
 
 from sklearn.utils.validation import _deprecate_positional_args
 from sklearn._config import get_config as _get_config
@@ -658,7 +658,7 @@ def check_X_y(X, y, accept_sparse=False, *, accept_large_sparse=True,
     else:
         y = column_or_1d(y, warn=True)
         _assert_all_finite(y)
-    npdtype = typemap(y.dtype())
+    npdtype = typemap(y.dtype)
     if y_numeric and npdtype == 'O':
         y = y.astype(af.Dype.f64)
 
@@ -684,11 +684,12 @@ def column_or_1d(y, *, warn=False):
 
     """
     #y = np.asarray(y)
-    #shape = np.shape(y)
-    shape = y.dims()
+    shape = np.shape(y)
+    #shape = y.ndim
+    #import ipdb; ipdb.set_trace()
     if len(shape) == 1:
-        #return np.ravel(y)
-        return af.flat(y)
+        return np.ravel(y)
+        #return af.flat(y)
     if len(shape) == 2 and shape[1] == 1:
         if warn:
             warnings.warn("A column-vector y was passed when a 1d array was"
@@ -787,4 +788,3 @@ def check_random_state(seed):
         return seed
     raise ValueError('%r cannot be used to seed a numpy.random.RandomState'
                      ' instance' % seed)
-
