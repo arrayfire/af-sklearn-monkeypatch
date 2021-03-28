@@ -4,8 +4,6 @@ import importlib
 from pathlib import Path
 from typing import Any, Optional
 
-import sklearn
-
 from .. import patches_info
 
 
@@ -36,6 +34,9 @@ def _load_instance(module_path: str, instance_name: str) -> Any:
 
 
 def _apply_patch(parent_module: str, target_instance_name: str, patched_module: Optional[str]) -> None:
+    if patched_module is None:
+        patched_module = parent_module
+
     loaded_parent_module = _load_module(parent_module)
-    loaded_patched_instance = _load_instance(patched_module, target_instance_name) if patched_module else None
+    loaded_patched_instance = _load_instance(patched_module, target_instance_name)
     setattr(loaded_parent_module, target_instance_name, loaded_patched_instance)
