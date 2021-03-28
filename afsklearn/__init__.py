@@ -1,7 +1,15 @@
-from .monkeypatcher import patch_sklearn, unpatch_sklearn, get_patch_names
+from pathlib import Path
+from typing import Any
 
-__version__ = '0.1.0'
-__author__ = 'ArrayFire'
-__all__ = [patch_sklearn, unpatch_sklearn, get_patch_names, 'preprocessing']
+import yaml
+
+app_dir = Path(__file__).resolve().parent
 
 
+def load_yaml_file(name: str, directory: Path = app_dir) -> Any:
+    path = directory / name
+    with path.open() as f:
+        return yaml.safe_load(f)
+
+
+patches_info = load_yaml_file("patched_modules.yml")

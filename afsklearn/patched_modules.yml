@@ -1,0 +1,4 @@
+mlp_classifier:
+  name: MLPClassifier
+  module: sklearn.neural_network
+  patched_module: afsklearn.neural_network.mlp_classifier
