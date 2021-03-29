@@ -9,7 +9,7 @@ from scipy import optimize
 from scipy.special import boxcox
 
 from ..base import afBaseEstimator, afTransformerMixin
-from ..utils.af_validation import check_array
+from .._validation import check_array
 #from ..utils.deprecation import deprecated
 #from ..utils.extmath import row_norms
 #from ..utils.extmath import (_incremental_mean_and_var,
