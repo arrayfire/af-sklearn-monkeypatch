@@ -1,122 +1,20 @@
-import numbers
-import warnings
-
 import arrayfire as af
+#import cupy as np
 import numpy as np
+import numpy
 import scipy.sparse as sp
-from numpy.core.numeric import ComplexWarning
-from sklearn.base import BaseEstimator, TransformerMixin
-
-from .utils import (
-    assert_all_finite, _num_samples, _safe_accumulator_op, check_array,
-    check_consistent_length, check_X_y, column_or_1d)
-
-
-# Class inheriting from BaseEstimator
-# all methods that touch np.array are replaced
-# with ArrayFire compatible functionality
-class afBaseEstimator(BaseEstimator):
-    def get_submatrix(self, i, data):
-        """Return the submatrix corresponding to bicluster `i`.
-
-        Parameters
-        ----------
-        i : int
-            The index of the cluster.
-        data : array-like
-            The data.
-
-        Returns
-        -------
-        submatrix : ndarray
-            The submatrix corresponding to bicluster i.
-
-        Notes
-        -----
-        Works with sparse matrices. Only works if ``rows_`` and
-        ``columns_`` attributes exist.
-        """
-        data = check_array(data, accept_sparse='csr')
-        row_ind, col_ind = self.get_indices(i)
-        return data[row_ind[:, np.newaxis], col_ind]
-
-    def _validate_data(self, X, y=None, reset=True,
-                       validate_separately=False, **check_params):
-        """Validate input data and set or check the `n_features_in_` attribute.
-
-        Parameters
-        ----------
-        X : {array-like, sparse matrix, dataframe} of shape \
-                (n_samples, n_features)
-            The input samples.
-        y : array-like of shape (n_samples,), default=None
-            The targets. If None, `check_array` is called on `X` and
-            `check_X_y` is called otherwise.
-        reset : bool, default=True
-            Whether to reset the `n_features_in_` attribute.
-            If False, the input will be checked for consistency with data
-            provided when reset was last True.
-        validate_separately : False or tuple of dicts, default=False
-            Only used if y is not None.
-            If False, call validate_X_y(). Else, it must be a tuple of kwargs
-            to be used for calling check_array() on X and y respectively.
-        **check_params : kwargs
-            Parameters passed to :func:`sklearn.utils.check_array` or
-            :func:`sklearn.utils.check_X_y`. Ignored if validate_separately
-            is not False.
-
-        Returns
-        -------
-        out : {ndarray, sparse matrix} or tuple of these
-            The validated input. A tuple is returned if `y` is not None.
-        """
-
-        if y is None:
-            if self._get_tags()['requires_y']:
-                raise ValueError(
-                    f"This {self.__class__.__name__} estimator "
-                    f"requires y to be passed, but the target y is None."
-                )
-            X = check_array(X, **check_params)
-            out = X
-        else:
-            if validate_separately:
-                # We need this because some estimators validate X and y
-                # separately, and in general, separately calling check_array()
-                # on X and y isn't equivalent to just calling check_X_y()
-                # :(
-                check_X_params, check_y_params = validate_separately
-                X = check_array(X, **check_X_params)
-                y = check_array(y, **check_y_params)
-            else:
-                X, y = check_X_y(X, y, **check_params)
-            out = X, y
-
-        if check_params.get('ensure_2d', True):
-            self._check_n_features(X, reset=reset)
-
-        return out
-
-# Class inheriting from TransformerMixin
-# all methods that touch np.array are replaced
-# with ArrayFire compatible functionality
-class afTransformerMixin(TransformerMixin):
-    pass
-
-import numbers
 import warnings
+import numbers
 from collections.abc import Sequence
+from scipy.sparse.base import spmatrix
 from itertools import chain
 
-import arrayfire as af
-#import numpy as np
-import numpy
-import numpy as np
-import scipy.sparse as sp
-from scipy.sparse.base import spmatrix
-from sklearn.preprocessing import LabelBinarizer
 from sklearn.utils.validation import _deprecate_positional_args
-
+from sklearn.preprocessing import LabelBinarizer
+from af_validation import _num_samples
+from af_validation import check_is_fitted
+from af_validation import check_array
+from af_validation import column_or_1d
 
 def _unique_multiclass(y):
     if hasattr(y, '__array__'):
@@ -195,7 +93,7 @@ def unique_labels(*ys):
         raise ValueError("Unknown label type: %s" % repr(ys))
 
     #ys_labels = set(chain.from_iterable(_unique_labels(y.tolist()) for y in ys))
-    ys_labels = set(chain.from_iterable(_unique_labels(y.tolist()) for y in ys))
+    ys_labels = set(chain.from_iterable(_unique_labels(y.to_list()) for y in ys))
 
     # Check that we don't mix string type with number type
     if (len(set(isinstance(label, str) for label in ys_labels)) > 1):
@@ -458,9 +356,9 @@ def _inverse_binarize_thresholding(y, output_type, classes, threshold):
 
 def af_in1d(arr0, arr1):
     #temporarily perform computation in numy, potentially change to arrayfire
-    #a0 = arr0.to_ndarray()
+    a0 = arr0.to_ndarray()
     #a1 = arr1.to_ndarray()
-    isin = np.in1d(arr0,  arr1)
+    isin = np.in1d(a0,  arr1)
     return isin
 
 @_deprecate_positional_args
@@ -584,7 +482,7 @@ def label_binarize(y, *, classes, neg_label=0, pos_label=1,
         y_in_classes = af.interop.from_ndarray(y_in_classes, copy=True)
         y[y_in_classes]
         y_seen = y[y_in_classes]
-        y_seen = y_seen#.to_ndarray()
+        y_seen = y_seen.to_ndarray()
         indices = np.searchsorted(sorted_class, y_seen)
         indptr = np.hstack((0, np.cumsum(y_in_classes)))
 
@@ -625,9 +523,10 @@ def label_binarize(y, *, classes, neg_label=0, pos_label=1,
         if sparse_output:
             Y = Y.getcol(-1)
         else:
-            # Y = Y[:, -1].reshape((-1, 1))
-            Y = Y.reshape((-1, 1))
+            Y = Y[:, -1].reshape((-1, 1))
 
+
+    #return Y
     return Y
 
 

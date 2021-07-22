@@ -4,18 +4,17 @@
 # License: BSD 3 clause
 
 import arrayfire as af
-import numpy as np
+#import numpy as np
+import cupy as np
 import numpy
-from ..utils._type_utils import typemap
-
+from af_type_utils import typemap
 
 def logistic_sigmoid(x):
-    # return 1 / (1 + af.exp(-x))
+    #return 1 / (1 + af.exp(-x))
     return 1 / (1 + np.exp(-x))
 
-
 def xlogy(x, y):
-    return x * af.log(af.to_array(y))
+    return x * af.log(y)
 
 
 def identity(X):
@@ -44,7 +43,7 @@ def logistic(X):
     X_new : {array-like, sparse matrix}, shape (n_samples, n_features)
         The transformed data.
     """
-    return logistic_sigmoid(X)
+    return logistic_sigmoid(X, out=X)
 
 
 def tanh(X):
@@ -219,6 +218,7 @@ def log_loss(y_true, y_prob):
     return - af.sum(af.flat(xlogy(y_true, y_prob))) / y_prob.shape[0]
 
 
+
 def binary_log_loss(y_true, y_prob):
     """Compute binary logistic loss for classification.
     This is identical to log_loss in binary classification case,
@@ -237,7 +237,8 @@ def binary_log_loss(y_true, y_prob):
     """
     eps = np.finfo(y_prob.dtype).eps
     y_prob = np.clip(y_prob, eps, 1 - eps)
-    return af.sum(-(xlogy(y_true, y_prob) + xlogy(1 - y_true, 1 - y_prob))) / y_prob.shape[0]
+    return -(xlogy(y_true, y_prob) +
+             xlogy(1 - y_true, 1 - y_prob)).sum() / y_prob.shape[0]
 
 
 LOSS_FUNCTIONS = {'squared_loss': squared_loss, 'log_loss': log_loss,

@@ -4,6 +4,7 @@
 # License: BSD 3 clause
 
 import arrayfire as af
+#import numpy as np
 import numpy as np
 import numpy
 from ..utils._type_utils import typemap

@@ -788,3 +788,58 @@ def check_random_state(seed):
         return seed
     raise ValueError('%r cannot be used to seed a numpy.random.RandomState'
                      ' instance' % seed)
+
+def _check_sample_weight(sample_weight, X, dtype=None, copy=False):
+    """Validate sample weights.
+
+    Note that passing sample_weight=None will output an array of ones.
+    Therefore, in some cases, you may want to protect the call with:
+    if sample_weight is not None:
+        sample_weight = _check_sample_weight(...)
+
+    Parameters
+    ----------
+    sample_weight : {ndarray, Number or None}, shape (n_samples,)
+       Input sample weights.
+
+    X : {ndarray, list, sparse matrix}
+        Input data.
+
+    dtype: dtype, default=None
+       dtype of the validated `sample_weight`.
+       If None, and the input `sample_weight` is an array, the dtype of the
+       input is preserved; otherwise an array with the default numpy dtype
+       is be allocated.  If `dtype` is not one of `float32`, `float64`,
+       `None`, the output will be of dtype `float64`.
+
+    copy : bool, default=False
+        If True, a copy of sample_weight will be created.
+
+    Returns
+    -------
+    sample_weight : ndarray of shape (n_samples,)
+       Validated sample weight. It is guaranteed to be "C" contiguous.
+    """
+    n_samples = _num_samples(X)
+
+    if dtype is not None and dtype not in [np.float32, np.float64]:
+        dtype = np.float64
+
+    if sample_weight is None:
+        sample_weight = np.ones(n_samples, dtype=dtype)
+    elif isinstance(sample_weight, numbers.Number):
+        sample_weight = np.full(n_samples, sample_weight, dtype=dtype)
+    else:
+        if dtype is None:
+            dtype = [np.float64, np.float32]
+        sample_weight = check_array(
+            sample_weight, accept_sparse=False, ensure_2d=False, dtype=dtype,
+            order="C", copy=copy
+        )
+        if sample_weight.ndim != 1:
+            raise ValueError("Sample weights must be 1D array or scalar")
+
+        if sample_weight.shape != (n_samples,):
+            raise ValueError("sample_weight.shape == {}, expected {}!"
+                             .format(sample_weight.shape, (n_samples,)))
+    return sample_weight

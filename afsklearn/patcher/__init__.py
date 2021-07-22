@@ -20,11 +20,16 @@ class Patcher:
         patch_config = patches_info[module_name]
         _apply_patch(patch_config["module"], patch_config["name"], None)
 
-    def patch_all():
-        raise NotImplemented
+    @staticmethod
+    def patch_all() -> None:
+        for name in patches_info:
+            Patcher.patch(name)
 
-    def rollback_all():
-        raise NotImplemented
+    @staticmethod
+    def rollback_all() -> None:
+        for name in patches_info:
+            if name in temporary_storage:
+                Patcher.rollback(name)
 
 
 def _load_module(module_path: str) -> Any:

@@ -5,7 +5,7 @@ from sklearn.datasets import make_classification
 from sklearn.model_selection import train_test_split
 
 from afsklearn.patcher import Patcher
-from . import measure_time
+from timing import measure_time
 
 X, y = make_classification(n_samples=10000, random_state=1)
 X_train, X_test, y_train, y_test = train_test_split(X, y, stratify=y, random_state=1)
@@ -31,4 +31,4 @@ def test_afsklearn_mlp() -> None:
 
 if __name__ == "__main__":
     test_afsklearn_mlp()
-    test_sklearn_mlp()
+    #test_sklearn_mlp()
