@@ -7,7 +7,7 @@ quantile_transformer:
   name: QuantileTransformer
   module: sklearn.preprocessing
   module_patch: afsklearn.preprocessing._data
-  
+
 simple_imputer:
   name: SimpleImputer
   module: sklearn.impute
@@ -27,3 +27,8 @@ one_hot_encoder:
   name: OneHotEncoder
   module: sklearn.preprocessing
   module_patch: afsklearn.preprocessing._encoders
+
+variance_threshold:
+  name: VarianceThreshold
+  module: sklearn.feature_selection
+  module_patch: afsklearn.feature_selection.variance_threshold

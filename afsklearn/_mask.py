@@ -48,3 +48,25 @@ def _get_mask(X, value_to_mask):
     )
 
     return Xt_sparse
+
+
+def safe_mask(X, mask):
+    """Return a mask which is safe to use on X.
+    Parameters
+    ----------
+    X : {array-like, sparse matrix}
+        Data on which to apply mask.
+    mask : ndarray
+        Mask to be used on X.
+    Returns
+    -------
+        mask
+    """
+    mask = np.asarray(mask)
+    if np.issubdtype(mask.dtype, np.signedinteger):
+        return mask
+
+    if hasattr(X, "toarray"):
+        ind = np.arange(mask.shape[0])
+        mask = ind[mask]
+    return mask
