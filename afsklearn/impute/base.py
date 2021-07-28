@@ -1,12 +1,13 @@
+import numbers
+
 import arrayfire as af
 import numpy as np
-import numbers
 from scipy import sparse as sp
-
-from ..base import afBaseEstimator, afTransformerMixin
-from .._validation import is_scalar_nan, check_is_fitted
-from .._mask import _get_mask
 from sklearn.utils.validation import _deprecate_positional_args
+
+from .._mask import _get_mask
+from .._validation import check_is_fitted, is_scalar_nan
+from ..base import afBaseEstimator, afTransformerMixin
 
 
 def _check_inputs_dtype(X, missing_values):
@@ -18,7 +19,7 @@ def _check_inputs_dtype(X, missing_values):
                          .format(X.dtype, type(missing_values)))
 
 
-class _BaseImputer(afTransformerMixin, afBaseEstimator):
+class _afBaseImputer(afTransformerMixin, afBaseEstimator):
     """Base class for all imputers.
     It adds automatically support for `add_indicator`.
     """

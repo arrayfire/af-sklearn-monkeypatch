@@ -1,14 +1,7 @@
 import arrayfire as af
 import numpy as np
-import numpy
 import scipy.sparse as sparse
-#import scipy.sparse as sp
-import warnings
-import numbers
-from collections.abc import Sequence
-from scipy.sparse.base import spmatrix
-from itertools import chain
-
+from sklearn.utils.sparsefuncs_fast import csr_row_norms
 from sklearn.utils.validation import _deprecate_positional_args
 
 
@@ -46,10 +39,38 @@ def safe_sparse_dot(a, b, *, dense_output=False):
         else:
             ret = np.dot(a, b)
     else:
-        #ret = a @ b
+        # ret = a @ b
         ret = af.blas.matmul(a.as_type(af.Dtype.f32), b.as_type(af.Dtype.f32))
 
     if (sparse.issparse(a) and sparse.issparse(b)
             and dense_output and hasattr(ret, "toarray")):
         return ret.toarray()
     return ret
+
+
+def row_norms(X, squared=False):
+    """Row-wise (squared) Euclidean norm of X.
+    Equivalent to np.sqrt((X * X).sum(axis=1)), but also supports sparse
+    matrices and does not create an X.shape-sized temporary.
+    Performs no input validation.
+    Parameters
+    ----------
+    X : array-like
+        The input array.
+    squared : bool, default=False
+        If True, return squared norms.
+    Returns
+    -------
+    array-like
+        The row-wise (squared) Euclidean norm of X.
+    """
+    if sparse.issparse(X):
+        if not isinstance(X, sparse.csr_matrix):
+            X = sparse.csr_matrix(X)
+        norms = csr_row_norms(X)
+    else:
+        norms = np.einsum('ij,ij->i', X, X)
+
+    if not squared:
+        np.sqrt(norms, norms)
+    return norms

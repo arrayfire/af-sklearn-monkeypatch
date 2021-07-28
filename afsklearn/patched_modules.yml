@@ -11,7 +11,12 @@ quantile_transformer:
 simple_imputer:
   name: SimpleImputer
   module: sklearn.impute
-  module_patch: afsklearn.impute.simple_imputer
+  module_patch: afsklearn.impute.simple
+
+iterative_imputer:
+  name: IterativeImputer
+  module: sklearn.impute._iterative
+  module_patch: afsklearn.impute.iterative
 
 sgd_classifier:
   name: SGDClassifier

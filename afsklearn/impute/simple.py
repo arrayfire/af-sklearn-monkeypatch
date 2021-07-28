@@ -11,7 +11,7 @@ from sklearn.utils.validation import FLOAT_DTYPES, _deprecate_positional_args
 from .._mask import _get_mask
 from .._sparsefuncs import _get_median
 from .._validation import check_is_fitted, is_scalar_nan
-from .base import _BaseImputer, _check_inputs_dtype
+from .base import _afBaseImputer, _check_inputs_dtype
 
 
 def _most_frequent(array, extra_value, n_repeat):
@@ -50,7 +50,7 @@ def _most_frequent(array, extra_value, n_repeat):
         return min(most_frequent_value, extra_value)
 
 
-class SimpleImputer(_BaseImputer):
+class SimpleImputer(_afBaseImputer):
     """Imputation transformer for completing missing values.
     Read more in the :ref:`User Guide <impute>`.
     .. versionadded:: 0.20
