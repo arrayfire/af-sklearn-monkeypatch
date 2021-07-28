@@ -1,6 +1,3 @@
-import time
-
-import sklearn
 from sklearn.datasets import make_classification
 from sklearn.model_selection import train_test_split
 
@@ -31,4 +28,4 @@ def test_afsklearn_mlp() -> None:
 
 if __name__ == "__main__":
     test_afsklearn_mlp()
-    test_sklearn_mlp()
+    # test_sklearn_mlp()

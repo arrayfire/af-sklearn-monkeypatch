@@ -2,3 +2,13 @@ mlp_classifier:
   name: MLPClassifier
   module: sklearn.neural_network
   module_patch: afsklearn.neural_network.mlp_classifier
+
+quantile_transformer:
+  name: QuantileTransformer
+  module: sklearn.preprocessing
+  module_patch: afsklearn.preprocessing._data
+  
+simple_imputer:
+  name: SimpleImputer
+  module: sklearn.impute
+  module_patch: afsklearn.impute.simple_imputer

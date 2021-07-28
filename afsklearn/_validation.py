@@ -11,6 +11,37 @@ from ._type_utils import typemap
 from sklearn.utils.validation import _deprecate_positional_args
 from sklearn._config import get_config as _get_config
 
+def _object_dtype_isnan(X):
+    return X != X
+
+def is_scalar_nan(x):
+    """Tests if x is NaN.
+    This function is meant to overcome the issue that np.isnan does not allow
+    non-numerical types as input, and that np.nan is not float('nan').
+    Parameters
+    ----------
+    x : any type
+    Returns
+    -------
+    boolean
+    Examples
+    --------
+    >>> is_scalar_nan(np.nan)
+    True
+    >>> is_scalar_nan(float("nan"))
+    True
+    >>> is_scalar_nan(None)
+    False
+    >>> is_scalar_nan("")
+    False
+    >>> is_scalar_nan([np.nan])
+    False
+    """
+    # convert from numpy.bool_ to python bool to ensure that testing
+    # is_scalar_nan(x) is True does not fail.
+    return bool(isinstance(x, numbers.Real) and np.isnan(x))
+
+
 def check_consistent_length(*arrays):
     """Check that all arrays have consistent first dimensions.
 
@@ -27,6 +58,7 @@ def check_consistent_length(*arrays):
     if len(uniques) > 1:
         raise ValueError("Found input variables with inconsistent numbers of"
                          " samples: %r" % [int(l) for l in lengths])
+
 
 def _safe_accumulator_op(op, x, *args, **kwargs):
     """
@@ -53,6 +85,7 @@ def _safe_accumulator_op(op, x, *args, **kwargs):
     else:
         result = op(x, *args, **kwargs)
     return result
+
 
 def _determine_key_type(key, accept_slice=True):
     """Determine the data type of key.
@@ -116,12 +149,14 @@ def _determine_key_type(key, accept_slice=True):
             raise ValueError(err_msg)
     raise ValueError(err_msg)
 
+
 def _array_indexing(array, key, key_dtype, axis):
     """Index an array or scipy.sparse consistently across NumPy version."""
     if isinstance(key, tuple):
         key = list(key)
-    afkey = af.interop.from_ndarray(key) #TODO: replace w/arrayfire keys
+    afkey = af.interop.from_ndarray(key)  # TODO: replace w/arrayfire keys
     return array[afkey, :] if axis == 0 else array[:, afkey]
+
 
 def _safe_indexing(X, indices, *, axis=0):
     """Return rows, items or columns of X using indices.
@@ -200,6 +235,7 @@ def _safe_indexing(X, indices, *, axis=0):
     else:
         return _list_indexing(X, indices, indices_dtype)
 
+
 def _assert_all_finite(X, allow_nan=False, msg_dtype=None):
     """Like assert_all_finite, but only for ndarray."""
     # validation is also imported in extmath
@@ -220,20 +256,22 @@ def _assert_all_finite(X, allow_nan=False, msg_dtype=None):
                 not allow_nan and not np.isfinite(X).all()):
             type_err = 'infinity' if allow_nan else 'NaN, infinity'
             raise ValueError(
-                    msg_err.format
-                    (type_err,
-                     msg_dtype if msg_dtype is not None else X.dtype)
+                msg_err.format
+                (type_err,
+                 msg_dtype if msg_dtype is not None else X.dtype)
             )
     # for object dtype data, we only check for NaNs (GH-13254)
     elif X.dtype == np.dtype('object') and not allow_nan:
         if _object_dtype_isnan(X).any():
             raise ValueError("Input contains NaN")
 
+
 def _ensure_no_complex_data(array):
     if hasattr(array, 'dtype') and array.dtype is not None \
             and hasattr(array.dtype, 'kind') and array.dtype.kind == "c":
         raise ValueError("Complex data not supported\n"
                          "{}\n".format(array))
+
 
 def _num_samples(x):
     """Return number of samples in array-like x."""
@@ -268,7 +306,6 @@ def check_array(array, accept_sparse=False, *, accept_large_sparse=True,
                 dtype="numeric", order=None, copy=False, force_all_finite=True,
                 ensure_2d=True, allow_nd=False, ensure_min_samples=1,
                 ensure_min_features=1, estimator=None):
-
     """Input validation on an array, list, sparse matrix or similar.
 
     By default, the input is checked to be a non-empty 2D array containing
@@ -355,7 +392,7 @@ def check_array(array, accept_sparse=False, *, accept_large_sparse=True,
     # function returns
     array_orig = array
     #import pdb;pdb.set_trace()
-    return array #TMP todo: perform checks for af::array
+    return array  # TMP todo: perform checks for af::array
 
     # store whether originally we wanted numeric dtype
     dtype_numeric = isinstance(dtype, str) and dtype == "numeric"
@@ -494,15 +531,15 @@ def check_array(array, accept_sparse=False, *, accept_large_sparse=True,
                     "if it contains a single sample.".format(array))
 
         # in the future np.flexible dtypes will be handled like object dtypes
-        #if dtype_numeric and np.issubdtype(array.dtype, np.flexible):
-            #warnings.warn(
+        # if dtype_numeric and np.issubdtype(array.dtype, np.flexible):
+            # warnings.warn(
                 #"Beginning in version 0.22, arrays of bytes/strings will be "
                 #"converted to decimal numbers if dtype='numeric'. "
                 #"It is recommended that you convert the array to "
                 #"a float dtype before using it in scikit-learn, "
                 #"for example by using "
                 #"your_array = your_array.astype(np.float64).",
-                #FutureWarning, stacklevel=2)
+                # FutureWarning, stacklevel=2)
 
         # make sure we actually converted to numeric:
         if dtype_numeric and array.dtype.kind == "O":
@@ -535,6 +572,7 @@ def check_array(array, accept_sparse=False, *, accept_large_sparse=True,
         array = np.array(array, dtype=dtype, order=order)
 
     return array
+
 
 @_deprecate_positional_args
 def check_X_y(X, y, accept_sparse=False, *, accept_large_sparse=True,
@@ -689,19 +727,20 @@ def column_or_1d(y, *, warn=False):
     #import ipdb; ipdb.set_trace()
     if len(shape) == 1:
         return np.ravel(y)
-        #return af.flat(y)
+        # return af.flat(y)
     if len(shape) == 2 and shape[1] == 1:
         if warn:
             warnings.warn("A column-vector y was passed when a 1d array was"
                           " expected. Please change the shape of y to "
                           "(n_samples, ), for example using ravel().",
                           DataConversionWarning, stacklevel=2)
-        #return np.ravel(y)
+        # return np.ravel(y)
         return af.flat(y)
 
     raise ValueError(
         "y should be a 1d array, "
         "got an array of shape {} instead.".format(shape))
+
 
 @_deprecate_positional_args
 def check_is_fitted(estimator, attributes=None, *, msg=None, all_or_any=all):
@@ -768,6 +807,7 @@ def check_is_fitted(estimator, attributes=None, *, msg=None, all_or_any=all):
 
     if not attrs:
         raise NotFittedError(msg % {'name': type(estimator).__name__})
+
 
 def check_random_state(seed):
     """Turn seed into a np.random.RandomState instance

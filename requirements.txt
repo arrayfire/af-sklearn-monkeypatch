@@ -1,2 +1,2 @@
-scikit-learn==0.24.1
+-e .
 arrayfire==3.8.0+cu112 -f https://repo.arrayfire.com/python/wheels/3.8.0/

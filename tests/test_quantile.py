@@ -1,26 +1,30 @@
-import sklearn
-import daal4py.sklearn
-import time
-import afsklearn
 import numpy as np
-from afsklearn.preprocessing import QuantileTransformer as afQT
 
-nbench = 5
+from afsklearn.patcher import Patcher
+from . import measure_time
+
 rng = np.random.RandomState(0)
 X = np.sort(rng.normal(loc=0.5, scale=0.25, size=(25000, 100)), axis=0)
 
-tic = time.perf_counter()
-#import pdb; pdb.set_trace()
-for n in range(nbench):
-    qt = sklearn.preprocessing.QuantileTransformer()
-    qt.fit_transform(X)
-toc = time.perf_counter()
-print(f"sklearn fit time {(toc - tic)/nbench:0.4f} seconds")
 
-sklearn.preprocessing.QuantileTransformer = afQT
-
-for n in range(nbench):
-    qt = sklearn.preprocessing.QuantileTransformer()
+def sklearn_example() -> None:
+    from sklearn.preprocessing import QuantileTransformer
+    qt = QuantileTransformer()
     qt.fit_transform(X)
-toc = time.perf_counter()
-print(f"sklearn fit time {(toc - tic)/nbench:0.4f} seconds")
+
+
+@measure_time
+def test_sklearn() -> None:
+    sklearn_example()
+
+
+@measure_time
+def test_afsklearn() -> None:
+    Patcher.patch("quantile_transformer")
+    sklearn_example()
+    Patcher.rollback("quantile_transformer")
+
+
+if __name__ == "__main__":
+    test_afsklearn()
+    # test_sklearn()
