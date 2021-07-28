@@ -27,3 +27,18 @@ To run with time measurements use the flag `-s`
 ```console
 pytest test/test_mlp.py -s
 ```
+
+--
+
+## TODO
+
+- GradientBoosting
+- OneHotEncoder
+- RandomForest
+- SelectFWE
+- QuantileTransformer
+- ExtraTreesClassifier
+- Imputer
+- GenericUnivariateSelect
+- SGDClassifier
+- LinearSVC
