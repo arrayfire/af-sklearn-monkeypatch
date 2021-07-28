@@ -1,5 +1,10 @@
 # Python cache
 __pycache__/
 
+# Build
+build
+dist
+*.egg-info
+
 # Virtual env
 venv

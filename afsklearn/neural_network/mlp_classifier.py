@@ -1,9 +1,10 @@
 import arrayfire as af
 import numpy as np
 
-from ..base import afLabelBinarizer
+from ..base import afLabelBinarizer, unique_labels
 from .base import BaseMultilayerPerceptron
 from .._classifier_mixin import afClassifierMixin
+from .._validation import column_or_1d, check_is_fitted
 
 from sklearn.utils.validation import _deprecate_positional_args
 
