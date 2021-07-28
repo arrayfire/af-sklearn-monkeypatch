@@ -9,8 +9,8 @@ from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.preprocessing import LabelBinarizer
 from sklearn.utils.validation import _deprecate_positional_args
 
-from ._validation import (_assert_all_finite, _num_samples, check_array,
-                          check_is_fitted, check_X_y, column_or_1d)
+from ._sparsefuncs import min_max_axis
+from ._validation import _assert_all_finite, _num_samples, check_array, check_is_fitted, check_X_y, column_or_1d
 
 
 # Class inheriting from BaseEstimator
@@ -184,7 +184,6 @@ def unique_labels(*ys):
     if not _unique_labels:
         raise ValueError("Unknown label type: %s" % repr(ys))
 
-    #ys_labels = set(chain.from_iterable(_unique_labels(y.tolist()) for y in ys))
     ys_labels = set(chain.from_iterable(_unique_labels(y.tolist()) for y in ys))
 
     # Check that we don't mix string type with number type
@@ -227,8 +226,8 @@ def is_multilabel(y):
     if not (hasattr(y, "shape") and y.ndim == 2 and y.shape[1] > 1):
         return False
 
-    if issparse(y):
-        if isinstance(y, (dok_matrix, lil_matrix)):
+    if sp.issparse(y):
+        if isinstance(y, (sp.dok_matrix, sp.lil_matrix)):
             y = y.tocsr()
         return (len(y.data) == 0 or np.unique(y.data).size == 1 and
                 (y.dtype.kind in 'biu' or  # bool, int, uint
@@ -238,6 +237,10 @@ def is_multilabel(y):
 
         return len(labels) < 3 and (y.dtype.kind in 'biu' or  # bool, int, uint
                                     _is_integral_float(labels))
+
+
+def _is_integral_float(y):
+    return y.dtype.kind == "f" and np.all(y.astype(int) == y)
 
 
 def type_of_target(y):
@@ -451,8 +454,8 @@ def _inverse_binarize_thresholding(y, output_type, classes, threshold):
 
 def af_in1d(arr0, arr1):
     # temporarily perform computation in numy, potentially change to arrayfire
-    #a0 = arr0.to_ndarray()
-    #a1 = arr1.to_ndarray()
+    # a0 = arr0.to_ndarray()
+    # a1 = arr1.to_ndarray()
     isin = np.in1d(arr0,  arr1)
     return isin
 
@@ -580,7 +583,7 @@ def label_binarize(y, *, classes, neg_label=0, pos_label=1,
         y_seen = y[y_in_classes]
         y_seen = y_seen  # .to_ndarray()
         indices = np.searchsorted(sorted_class, y_seen)
-        indptr = np.hstack((0, np.cumsum(y_in_classes)))
+        indptr = np.hstack((0, np.cumsum(y_in_classes)))  # FIXME
 
         data = np.empty_like(indices)
         data.fill(pos_label)

@@ -1,4 +1,11 @@
-import arrayfire as af
+import numpy as np  # FIXME
+from numpy import count_nonzero
+from scipy.sparse import csr_matrix
+from scipy.special import expit
+
+from ._extmath import safe_sparse_dot
+from ._validation import check_array, check_consistent_length, check_is_fitted, column_or_1d
+from .base import type_of_target
 
 
 def _weighted_sum(sample_score, sample_weight, normalize=False):

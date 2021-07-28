@@ -1,6 +1,7 @@
 import numpy as np
 
 from afsklearn.patcher import Patcher
+
 from . import measure_time
 
 rng = np.random.RandomState(0)

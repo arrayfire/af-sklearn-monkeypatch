@@ -2,6 +2,7 @@ from sklearn.datasets import make_classification
 from sklearn.model_selection import train_test_split
 
 from afsklearn.patcher import Patcher
+
 from . import measure_time
 
 X, y = make_classification(n_samples=10000, random_state=1)

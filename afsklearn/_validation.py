@@ -1,15 +1,16 @@
+import numbers
+import warnings
+from inspect import isclass
+from itertools import compress
+
 import arrayfire as af
 import numpy as np
-import numpy
 import scipy.sparse as sp
-import warnings
-import numbers
-from numpy.core.numeric import ComplexWarning
-from inspect import signature, isclass, Parameter
-from ._type_utils import typemap
-
-from sklearn.utils.validation import _deprecate_positional_args
 from sklearn._config import get_config as _get_config
+from sklearn.exceptions import DataConversionWarning, NotFittedError
+from sklearn.utils.validation import _deprecate_positional_args
+
+from ._type_utils import typemap
 
 
 def _object_dtype_isnan(X):
@@ -59,7 +60,7 @@ def check_consistent_length(*arrays):
     uniques = np.unique(lengths)
     if len(uniques) > 1:
         raise ValueError("Found input variables with inconsistent numbers of"
-                         " samples: %r" % [int(l) for l in lengths])
+                         " samples: %r" % [int(x) for x in lengths])
 
 
 def _check_sample_weight(sample_weight, X, dtype=None, copy=False):
@@ -239,6 +240,32 @@ def _array_indexing(array, key, key_dtype, axis):
         key = list(key)
     afkey = af.interop.from_ndarray(key)  # TODO: replace w/arrayfire keys
     return array[afkey, :] if axis == 0 else array[:, afkey]
+
+
+def _pandas_indexing(X, key, key_dtype, axis):
+    """Index a pandas dataframe or a series."""
+    if hasattr(key, "shape"):
+        # Work-around for indexing with read-only key in pandas
+        # FIXME: solved in pandas 0.25
+        key = np.asarray(key)
+        key = key if key.flags.writeable else key.copy()
+    elif isinstance(key, tuple):
+        key = list(key)
+    # check whether we should index with loc or iloc
+    indexer = X.iloc if key_dtype == "int" else X.loc
+    return indexer[:, key] if axis else indexer[key]
+
+
+def _list_indexing(X, key, key_dtype):
+    """Index a Python list."""
+    if np.isscalar(key) or isinstance(key, slice):
+        # key is a slice or a scalar
+        return X[key]
+    if key_dtype == "bool":
+        # key is a boolean array-like
+        return list(compress(X, key))
+    # key is a integer array-like of key
+    return [X[idx] for idx in key]
 
 
 def _safe_indexing(X, indices, *, axis=0):
@@ -474,7 +501,6 @@ def check_array(array, accept_sparse=False, *, accept_large_sparse=True,
     # store reference to original array to check if copy is needed when
     # function returns
     array_orig = array
-    #import pdb;pdb.set_trace()
     return array  # TMP todo: perform checks for af::array
 
     # store whether originally we wanted numeric dtype
@@ -510,10 +536,9 @@ def check_array(array, accept_sparse=False, *, accept_large_sparse=True,
                 # name looks like an Integer Extension Array, now check for
                 # the dtype
                 with suppress(ImportError):
-                    from pandas import (Int8Dtype, Int16Dtype,
-                                        Int32Dtype, Int64Dtype,
-                                        UInt8Dtype, UInt16Dtype,
-                                        UInt32Dtype, UInt64Dtype)
+                    from pandas import (
+                        Int8Dtype, Int16Dtype, Int32Dtype, Int64Dtype, UInt8Dtype, UInt16Dtype, UInt32Dtype,
+                        UInt64Dtype)
                     if isinstance(dtype_iter, (Int8Dtype, Int16Dtype,
                                                Int32Dtype, Int64Dtype,
                                                UInt8Dtype, UInt16Dtype,
@@ -761,7 +786,6 @@ def check_X_y(X, y, accept_sparse=False, *, accept_large_sparse=True,
     y_converted : object
         The converted and validated y.
     """
-    #import pdb; pdb.set_trace()
     if y is None:
         raise ValueError("y cannot be None")
 
@@ -804,10 +828,7 @@ def column_or_1d(y, *, warn=False):
     y : array
 
     """
-    #y = np.asarray(y)
     shape = np.shape(y)
-    #shape = y.ndim
-    #import ipdb; ipdb.set_trace()
     if len(shape) == 1:
         return np.ravel(y)
         # return af.flat(y)

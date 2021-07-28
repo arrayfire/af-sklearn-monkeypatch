@@ -5,11 +5,9 @@
 # License: BSD 3 clause
 
 import time
-import numpy
-import numpy as np
-import arrayfire as af
-import numpy
 from math import sqrt
+
+import arrayfire as af
 
 
 class BaseOptimizer:
@@ -41,13 +39,9 @@ class BaseOptimizer:
             Containing gradients with respect to coefs_ and intercepts_ in MLP
             model. So length should be aligned with params
         """
-        t0 = time.time()
         updates = self._get_updates(grads)
-        #print(f'\tupdate0  time: {time.time()  - t0:.6f}')
-        t1 = time.time()
         for param, update in zip(self.params, updates):
             param += update
-        #print(f'\tupdate1  time: {time.time()  - t1:.6f}')
 
     def iteration_ends(self, time_step):
         """Perform update to learning rate and potentially other states at the
@@ -175,6 +169,7 @@ class SGDOptimizer(BaseOptimizer):
 
         return updates
 
+
 def paddims2(dims):
     if len(dims) > 1:
         return (dims[0], dims[1])
@@ -226,7 +221,6 @@ class AdamOptimizer(BaseOptimizer):
         self.epsilon = epsilon
         self.t = 0
 
-
         dims_list = [paddims2(param.dims()) for param in params]
 
         self.ms = [af.constant(0, dim[0], dim[1]) for dim in dims_list]
@@ -245,32 +239,15 @@ class AdamOptimizer(BaseOptimizer):
             The values to add to params
         """
         self.t += 1
-        #af.sync()
-        t0 = time.time()
 
         self.ms = [self.beta_1 * m + (1.0 - self.beta_1) * grad
                    for m, grad in zip(self.ms, grads)]
-        #af.sync()
-        #print(f'\tget_update0  time: {time.time()  - t0:.6f}')
-        t1 = time.time()
-        #cupy super slow here
-        #get_update0  time:   0.000916
-        #SKget_update0  time: 0.000066
-        #get_update1  time:   0.001256
-        #SKget_update1  time: 0.000099
         self.vs = [self.beta_2 * v + (1 - self.beta_2) * (grad * grad)
-                   for v, grad in zip(self.vs, grads)]#slooow
-        #af.sync()
-        #print(f'\tget_update1  time: {time.time()  - t1:.6f}')
-        #2 = time.time()
+                   for v, grad in zip(self.vs, grads)]  # slooow
         self.learning_rate = (self.learning_rate_init *
                               sqrt(1 - self.beta_2 ** self.t) /
                               (1 - self.beta_1 ** self.t))
-        #print(f'\tget_update2  time: {time.time()  - t2:.6f}')
-        #t3 = time.time()
         updates = [-self.learning_rate * m / (af.sqrt(v) + self.epsilon)
-                   for m, v in zip(self.ms, self.vs)] #sloow
-        #print(f'\tget_update3  time: {time.time()  - t3:.6f}')
-        #import pdb; pdb.set_trace()
+                   for m, v in zip(self.ms, self.vs)]  # sloow
 
         return updates

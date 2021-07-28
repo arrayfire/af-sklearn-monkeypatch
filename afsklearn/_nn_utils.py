@@ -4,9 +4,8 @@
 # License: BSD 3 clause
 
 import arrayfire as af
-#import numpy as np
 import numpy as np
-import numpy
+
 from ._type_utils import typemap
 
 
@@ -73,7 +72,7 @@ def relu(X):
     X_new : {array-like, sparse matrix}, shape (n_samples, n_features)
         The transformed data.
     """
-    #np.clip(X, 0, np.finfo(X.dtype).max, out=X)
+    # np.clip(X, 0, np.finfo(X.dtype).max, out=X)
     ii = (X < 0)
     if len(ii) > 0:
         X[ii] = 0
@@ -207,7 +206,7 @@ def log_loss(y_true, y_prob):
 #
 #    return - xlogy(y_true, y_prob).sum() / y_prob.shape[0]
 
-    eps = numpy.finfo(typemap(y_prob.dtype())).eps
+    eps = np.finfo(typemap(y_prob.dtype())).eps
     y_prob[y_prob < eps] = eps
     y_prob[y_prob > (1.0 - eps)] = 1.0 - eps
 
