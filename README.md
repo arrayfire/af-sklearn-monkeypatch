@@ -33,12 +33,15 @@ pytest test/test_mlp.py -s
 ## TODO
 
 - GradientBoosting
-- OneHotEncoder
+- OneHotEncoder  - Anton
 - RandomForest
 - SelectFWE
 - QuantileTransformer
 - ExtraTreesClassifier
-- Imputer
+- Imputer  - Anton
 - GenericUnivariateSelect
-- SGDClassifier
-- LinearSVC
+- SGDClassifier  - Anton
+- LinearSVC  - Stef
+- LinearSVR  - Stef
+- LogisticRegression  - Stef
+- Var threshold  - Anton

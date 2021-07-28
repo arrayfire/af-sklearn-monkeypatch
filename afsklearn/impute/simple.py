@@ -143,16 +143,14 @@ class SimpleImputer(_afBaseImputer):
         allowed_strategies = ["mean", "median", "most_frequent", "constant"]
         if self.strategy not in allowed_strategies:
             raise ValueError("Can only use these strategies: {0} "
-                             " got strategy={1}".format(allowed_strategies,
-                                                        self.strategy))
+                             " got strategy={1}".format(allowed_strategies, self.strategy))
 
         if self.strategy in ("most_frequent", "constant"):
             # If input is a list of strings, dtype = object.
             # Otherwise ValueError is raised in SimpleImputer
             # with strategy='most_frequent' or 'constant'
             # because the list is converted to Unicode numpy array
-            if isinstance(X, list) and \
-               any(isinstance(elem, str) for row in X for elem in row):
+            if isinstance(X, list) and any(isinstance(elem, str) for row in X for elem in row):
                 dtype = object
             else:
                 dtype = None
@@ -269,13 +267,10 @@ class SimpleImputer(_afBaseImputer):
                     statistics[i] = np.nan if s == 0 else column.sum() / s
 
                 elif strategy == "median":
-                    statistics[i] = _get_median(column,
-                                                n_zeros)
+                    statistics[i] = _get_median(column, n_zeros)
 
                 elif strategy == "most_frequent":
-                    statistics[i] = _most_frequent(column,
-                                                   0,
-                                                   n_zeros)
+                    statistics[i] = _most_frequent(column, 0, n_zeros)
         super()._fit_indicator(missing_mask)
 
         return statistics
@@ -346,8 +341,7 @@ class SimpleImputer(_afBaseImputer):
         statistics = self.statistics_
 
         if X.shape[1] != statistics.shape[0]:
-            raise ValueError("X has %d features per sample, expected %d"
-                             % (X.shape[1], self.statistics_.shape[0]))
+            raise ValueError("X has %d features per sample, expected %d" % (X.shape[1], self.statistics_.shape[0]))
 
         # compute mask before eliminating invalid features
         missing_mask = _get_mask(X, self.missing_values)
@@ -387,8 +381,7 @@ class SimpleImputer(_afBaseImputer):
                     np.arange(len(X.indptr) - 1, dtype=int),
                     np.diff(X.indptr))[mask]
 
-                X.data[mask] = valid_statistics[indexes].astype(X.dtype,
-                                                                copy=False)
+                X.data[mask] = valid_statistics[indexes].astype(X.dtype, copy=False)
         else:
             # use mask computed before eliminating invalid mask
             if valid_statistics_indexes is None:

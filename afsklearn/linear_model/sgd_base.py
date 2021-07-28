@@ -604,13 +604,12 @@ def fit_binary(est, i, X, y, alpha, C, learning_rate, max_iter,
     """
     # if average is not true, average_coef, and average_intercept will be
     # unused
-    y_i, coef, intercept, average_coef, average_intercept = \
-        _prepare_fit_binary(est, y, i)
+    y_i, coef, intercept, average_coef, average_intercept = _prepare_fit_binary(est, y, i)
     assert y_i.shape[0] == y.shape[0] == sample_weight.shape[0]
 
     random_state = check_random_state(random_state)
-    dataset, intercept_decay = make_dataset(
-        X, y_i, sample_weight, random_state=random_state)
+    # TODO: fix or replace with custom code
+    dataset, intercept_decay = make_dataset(X, y_i, sample_weight, random_state=random_state)
 
     penalty_type = est._get_penalty_type(est.penalty)
     learning_rate_type = est._get_learning_rate_type(learning_rate)
@@ -618,8 +617,7 @@ def fit_binary(est, i, X, y, alpha, C, learning_rate, max_iter,
     if validation_mask is None:
         validation_mask = est._make_validation_split(y_i)
     classes = np.array([-1, 1], dtype=y_i.dtype)
-    validation_score_cb = est._make_validation_score_cb(
-        validation_mask, X, y_i, sample_weight, classes=classes)
+    validation_score_cb = est._make_validation_score_cb(validation_mask, X, y_i, sample_weight, classes=classes)
 
     # numpy mtrand expects a C long which is a signed 32 bit integer under
     # Windows

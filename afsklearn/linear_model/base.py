@@ -38,8 +38,7 @@ def _preprocess_data(X, y, fit_intercept, normalize=False, copy=True,
         sample_weight = np.asarray(sample_weight)
 
     if check_input:
-        X = check_array(X, copy=copy, accept_sparse=['csr', 'csc'],
-                        dtype=FLOAT_DTYPES)
+        X = check_array(X, copy=copy, accept_sparse=['csr', 'csc'], dtype=FLOAT_DTYPES)
     elif copy:
         if sp.issparse(X):
             X = X.copy()
@@ -73,8 +72,7 @@ def _preprocess_data(X, y, fit_intercept, normalize=False, copy=True,
             X_offset = np.average(X, axis=0, weights=sample_weight)
             X -= X_offset
             if normalize:
-                X, X_scale = f_normalize(X, axis=0, copy=False,
-                                         return_norm=True)
+                X, X_scale = f_normalize(X, axis=0, copy=False, return_norm=True)
             else:
                 X_scale = np.ones(X.shape[1], dtype=X.dtype)
         y_offset = np.average(y, axis=0, weights=sample_weight)
@@ -101,8 +99,7 @@ class afLinearModel(afBaseEstimator, metaclass=ABCMeta):
         check_is_fitted(self)
 
         X = check_array(X, accept_sparse=['csr', 'csc', 'coo'])
-        return safe_sparse_dot(X, self.coef_.T,
-                               dense_output=True) + self.intercept_
+        return safe_sparse_dot(X, self.coef_.T, dense_output=True) + self.intercept_
 
     def predict(self, X):
         """
@@ -169,8 +166,7 @@ def make_dataset(X, y, sample_weight, random_state=None):
         ArrayData = ArrayDataset64
 
     if sp.issparse(X):
-        dataset = CSRData(X.data, X.indptr, X.indices, y, sample_weight,
-                          seed=seed)
+        dataset = CSRData(X.data, X.indptr, X.indices, y, sample_weight, seed=seed)
         intercept_decay = SPARSE_INTERCEPT_DECAY
     else:
         X = np.ascontiguousarray(X)
@@ -191,11 +187,9 @@ def _rescale_data(X, y, sample_weight):
     n_samples = X.shape[0]
     sample_weight = np.asarray(sample_weight)
     if sample_weight.ndim == 0:
-        sample_weight = np.full(n_samples, sample_weight,
-                                dtype=sample_weight.dtype)
+        sample_weight = np.full(n_samples, sample_weight, dtype=sample_weight.dtype)
     sample_weight = np.sqrt(sample_weight)
-    sw_matrix = sparse.dia_matrix((sample_weight, 0),
-                                  shape=(n_samples, n_samples))
+    sw_matrix = sparse.dia_matrix((sample_weight, 0), shape=(n_samples, n_samples))
     X = safe_sparse_dot(sw_matrix, X)
     y = safe_sparse_dot(sw_matrix, y)
     return X, y
