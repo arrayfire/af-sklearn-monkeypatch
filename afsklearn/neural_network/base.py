@@ -1,32 +1,19 @@
-import numpy as np
-import arrayfire as af
-import time
+import warnings
+from abc import ABCMeta, abstractmethod
 from math import sqrt
 
-from abc import ABCMeta, abstractmethod
-import warnings
-
-import sklearn
+import arrayfire as af
+import numpy as np
 from sklearn.base import is_classifier
-from sklearn.utils.validation import _deprecate_positional_args
-from sklearn.utils import check_random_state
-from sklearn.utils import gen_batches
-from sklearn.utils import shuffle
+from sklearn.exceptions import ConvergenceWarning
 from sklearn.model_selection import train_test_split
+from sklearn.utils import check_random_state, gen_batches, shuffle
 
-from ..base import afBaseEstimator
-from .._stochastic_optimizers import SGDOptimizer, AdamOptimizer
-from .._validation import _safe_indexing, check_is_fitted, check_array, column_or_1d
 from .._extmath import safe_sparse_dot
 from .._nn_utils import ACTIVATIONS, DERIVATIVES, LOSS_FUNCTIONS
-
-# from ..exceptions import ConvergenceWarning
-# from ..utils.extmath import safe_sparse_dot
-# from ..utils.multiclass import _check_partial_fit_first_call, unique_labels
-# from ..utils.multiclass import type_of_target
-# from ..utils.optimize import _check_optimize_result
-# import scipy.optimize
-
+from .._stochastic_optimizers import AdamOptimizer, SGDOptimizer
+from .._validation import _safe_indexing, check_array
+from ..base import afBaseEstimator
 
 _STOCHASTIC_SOLVERS = ['sgd', 'adam']
 
@@ -108,7 +95,7 @@ class BaseMultilayerPerceptron(afBaseEstimator, metaclass=ABCMeta):
         activations[i + 1] = output_activation(activations[i + 1])
 
         return activations
-#
+
     def _compute_loss_grad(self, layer, n_samples, activations, deltas,
                            coef_grads, intercept_grads):
         """Compute the gradient of loss with respect to coefs and intercept for
@@ -247,7 +234,7 @@ class BaseMultilayerPerceptron(afBaseEstimator, metaclass=ABCMeta):
         # Output for regression
         if not is_classifier(self):
             self.out_activation_ = 'identity'
-       # Output for multi class
+        # Output for multi class
         elif self._label_binarizer.y_type_ == 'multiclass':
             self.out_activation_ = 'softmax'
         # Output for binary class and multi-label
@@ -304,8 +291,8 @@ class BaseMultilayerPerceptron(afBaseEstimator, metaclass=ABCMeta):
         n_samples, n_features = X.shape
 
         # Ensure y is 2D
-        #if y.numdims() == 1:
-            #y = af.moddims(y, y.elements(), 1)
+        # if y.numdims() == 1:
+        # y = af.moddims(y, y.elements(), 1)
 
         self.n_outputs_ = y.shape[1] if y.numdims() > 1 else 1
 
@@ -452,8 +439,6 @@ class BaseMultilayerPerceptron(afBaseEstimator, metaclass=ABCMeta):
 #
     def _fit_stochastic(self, X, y, activations, deltas, coef_grads,
                         intercept_grads, layer_units, incremental):
-
-
         if not incremental or not hasattr(self, '_optimizer'):
             params = self.coefs_ + self.intercepts_
 
@@ -499,7 +484,7 @@ class BaseMultilayerPerceptron(afBaseEstimator, metaclass=ABCMeta):
                     sample_idx = shuffle(sample_idx,
                                          random_state=self._random_state)
 
-                #sloooow loop
+                # sloooow loop
                 accumulated_loss = 0.0
                 for batch_slice in gen_batches(n_samples, batch_size):
                     if self.shuffle:
@@ -564,7 +549,6 @@ class BaseMultilayerPerceptron(afBaseEstimator, metaclass=ABCMeta):
                         "Stochastic Optimizer: Maximum iterations (%d) "
                         "reached and the optimization hasn't converged yet."
                         % self.max_iter, ConvergenceWarning)
-
 
         except KeyboardInterrupt:
             warnings.warn("Training interrupted by user.")
@@ -668,8 +652,8 @@ class BaseMultilayerPerceptron(afBaseEstimator, metaclass=ABCMeta):
         activations = [X]
 
         for i in range(self.n_layers_ - 1):
-            #activations.append(np.empty((X.shape[0],
-                                         #layer_units[i + 1])))
+            # activations.append(np.empty((X.shape[0],
+            # layer_units[i + 1])))
             activations.append(af.constant(0, X.shape[0], layer_units[i + 1]))
 
         # forward propagate

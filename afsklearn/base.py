@@ -1,15 +1,16 @@
-import numbers
-import warnings
+from collections.abc import Sequence
+from itertools import chain
 
 import arrayfire as af
 import numpy as np
 import scipy.sparse as sp
-from numpy.core.numeric import ComplexWarning
+from scipy.sparse.base import spmatrix
 from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.preprocessing import LabelBinarizer
+from sklearn.utils.validation import _deprecate_positional_args
 
-from ._validation import (
-    _assert_all_finite, _ensure_no_complex_data, _num_samples, _safe_accumulator_op, check_array,
-    check_consistent_length, check_X_y, column_or_1d)
+from ._validation import (_assert_all_finite, _num_samples, check_array,
+                          check_is_fitted, check_X_y, column_or_1d)
 
 
 # Class inheriting from BaseEstimator
@@ -100,24 +101,10 @@ class afBaseEstimator(BaseEstimator):
 # Class inheriting from TransformerMixin
 # all methods that touch np.array are replaced
 # with ArrayFire compatible functionality
+
+
 class afTransformerMixin(TransformerMixin):
     pass
-
-import numbers
-import warnings
-from collections.abc import Sequence
-from itertools import chain
-
-import arrayfire as af
-#import numpy as np
-import numpy
-import numpy as np
-import scipy.sparse as sp
-from scipy.sparse.base import spmatrix
-from sklearn.preprocessing import LabelBinarizer
-from sklearn.utils.validation import _deprecate_positional_args
-
-from ._validation import _num_samples, check_array, check_is_fitted, column_or_1d
 
 
 def _unique_multiclass(y):
@@ -138,6 +125,7 @@ _FN_UNIQUE_LABELS = {
     'multiclass': _unique_multiclass,
     'multilabel-indicator': _unique_indicator,
 }
+
 
 def unique_labels(*ys):
     """Extract an ordered array of unique labels
@@ -205,6 +193,7 @@ def unique_labels(*ys):
 
     return np.array(sorted(ys_labels))
 
+
 def is_multilabel(y):
     """ Check if ``y`` is in a multilabel format.
 
@@ -249,6 +238,7 @@ def is_multilabel(y):
 
         return len(labels) < 3 and (y.dtype.kind in 'biu' or  # bool, int, uint
                                     _is_integral_float(labels))
+
 
 def type_of_target(y):
     """Determine the type of data indicated by the target.
@@ -370,6 +360,7 @@ def type_of_target(y):
     else:
         return 'binary'  # [1, 2] or [["a"], ["b"]]
 
+
 def _inverse_binarize_multiclass(y, classes):
     """Inverse label binarization transformation for multiclass.
 
@@ -459,11 +450,12 @@ def _inverse_binarize_thresholding(y, output_type, classes, threshold):
 
 
 def af_in1d(arr0, arr1):
-    #temporarily perform computation in numy, potentially change to arrayfire
+    # temporarily perform computation in numy, potentially change to arrayfire
     #a0 = arr0.to_ndarray()
     #a1 = arr1.to_ndarray()
     isin = np.in1d(arr0,  arr1)
     return isin
+
 
 @_deprecate_positional_args
 def label_binarize(y, *, classes, neg_label=0, pos_label=1,
@@ -586,7 +578,7 @@ def label_binarize(y, *, classes, neg_label=0, pos_label=1,
         y_in_classes = af.interop.from_ndarray(y_in_classes, copy=True)
         y[y_in_classes]
         y_seen = y[y_in_classes]
-        y_seen = y_seen#.to_ndarray()
+        y_seen = y_seen  # .to_ndarray()
         indices = np.searchsorted(sorted_class, y_seen)
         indptr = np.hstack((0, np.cumsum(y_in_classes)))
 
@@ -594,8 +586,8 @@ def label_binarize(y, *, classes, neg_label=0, pos_label=1,
         data.fill(pos_label)
         Y = data
 
-        #Y = sp.csr_matrix((data, indices, indptr),
-                          #shape=(n_samples, n_classes))
+        # Y = sp.csr_matrix((data, indices, indptr),
+        # shape=(n_samples, n_classes))
     elif y_type == "multilabel-indicator":
         Y = sp.csr_matrix(y)
         if pos_label != 1:
@@ -607,7 +599,7 @@ def label_binarize(y, *, classes, neg_label=0, pos_label=1,
                          "binarization" % y_type)
 
     if not sparse_output:
-        #Y = Y.toarray() #TODO: test if ndarray, then cast if not
+        # Y = Y.toarray() #TODO: test if ndarray, then cast if not
         Y = Y.astype(int, copy=False)
 
         if neg_label != 0:

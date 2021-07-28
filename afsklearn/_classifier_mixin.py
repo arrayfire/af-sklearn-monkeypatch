@@ -1,5 +1,6 @@
 import arrayfire as af
 
+
 def _weighted_sum(sample_score, sample_weight, normalize=False):
     if normalize:
         return np.average(sample_score, weights=sample_weight)
@@ -7,6 +8,7 @@ def _weighted_sum(sample_score, sample_weight, normalize=False):
         return np.dot(sample_score, sample_weight)
     else:
         return sample_score.sum()
+
 
 def _check_targets(y_true, y_pred):
     """Check that y_true and y_pred belong to the same classification task
@@ -61,8 +63,6 @@ def _check_targets(y_true, y_pred):
         y_type = 'multilabel-indicator'
 
     return y_type, y_true, y_pred
-
-
 
 
 def accuracy_score(y_true, y_pred, *, normalize=True, sample_weight=None):
@@ -123,6 +123,7 @@ def accuracy_score(y_true, y_pred, *, normalize=True, sample_weight=None):
 
     return _weighted_sum(score, sample_weight, normalize)
 
+
 class afClassifierMixin:
     """ArrayFire enabled Mixin class for all classifiers in scikit-learn."""
 
@@ -147,8 +148,77 @@ class afClassifierMixin:
         score : float
             Mean accuracy of self.predict(X) wrt. y.
         """
-        #return accuracy_score(y, self.predict(X), sample_weight=sample_weight)
-        return #TMP
+        # return accuracy_score(y, self.predict(X), sample_weight=sample_weight)
+        return  # TMP
 
     def _more_tags(self):
         return {'requires_y': True}
+
+
+class afLinearClassifierMixin(afClassifierMixin):
+    """Mixin for linear classifiers.
+    Handles prediction for sparse and dense X.
+    """
+
+    def decision_function(self, X):
+        """
+        Predict confidence scores for samples.
+        The confidence score for a sample is proportional to the signed
+        distance of that sample to the hyperplane.
+        Parameters
+        ----------
+        X : array-like or sparse matrix, shape (n_samples, n_features)
+            Samples.
+        Returns
+        -------
+        array, shape=(n_samples,) if n_classes == 2 else (n_samples, n_classes)
+            Confidence scores per (sample, class) combination. In the binary
+            case, confidence score for self.classes_[1] where >0 means this
+            class would be predicted.
+        """
+        check_is_fitted(self)
+
+        X = check_array(X, accept_sparse='csr')
+
+        n_features = self.coef_.shape[1]
+        if X.shape[1] != n_features:
+            raise ValueError("X has %d features per sample; expecting %d"
+                             % (X.shape[1], n_features))
+
+        scores = safe_sparse_dot(X, self.coef_.T,
+                                 dense_output=True) + self.intercept_
+        return scores.ravel() if scores.shape[1] == 1 else scores
+
+    def predict(self, X):
+        """
+        Predict class labels for samples in X.
+        Parameters
+        ----------
+        X : array-like or sparse matrix, shape (n_samples, n_features)
+            Samples.
+        Returns
+        -------
+        C : array, shape [n_samples]
+            Predicted class label per sample.
+        """
+        scores = self.decision_function(X)
+        if len(scores.shape) == 1:
+            indices = (scores > 0).astype(int)
+        else:
+            indices = scores.argmax(axis=1)
+        return self.classes_[indices]
+
+    def _predict_proba_lr(self, X):
+        """Probability estimation for OvR logistic regression.
+        Positive class probabilities are computed as
+        1. / (1. + np.exp(-self.decision_function(X)));
+        multiclass is handled by normalizing that over all classes.
+        """
+        prob = self.decision_function(X)
+        expit(prob, out=prob)
+        if prob.ndim == 1:
+            return np.vstack([1 - prob, prob]).T
+        else:
+            # OvR normalization, like LibLinear's predict_probability
+            prob /= prob.sum(axis=1).reshape((prob.shape[0], -1))
+            return prob

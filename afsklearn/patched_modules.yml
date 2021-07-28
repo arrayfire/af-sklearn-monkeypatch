@@ -12,3 +12,13 @@ simple_imputer:
   name: SimpleImputer
   module: sklearn.impute
   module_patch: afsklearn.impute.simple_imputer
+
+sgd_classifier:
+  name: SGDClassifier
+  module: sklearn.linear_model
+  module_patch: afsklearn.linear_model.sgd_classifier
+
+one_hot_encoder:
+  name: OneHotEncoder
+  module: sklearn.preprocessing
+  module_patch: afsklearn.preprocessing._encoders

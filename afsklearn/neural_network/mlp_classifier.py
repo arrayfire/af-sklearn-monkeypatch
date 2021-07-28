@@ -1,12 +1,12 @@
 import arrayfire as af
 import numpy as np
+from sklearn.utils.validation import _deprecate_positional_args
 
+from .._classifier_mixin import afClassifierMixin
+from .._validation import check_is_fitted, column_or_1d
 from ..base import afLabelBinarizer, unique_labels
 from .base import BaseMultilayerPerceptron
-from .._classifier_mixin import afClassifierMixin
-from .._validation import column_or_1d, check_is_fitted
 
-from sklearn.utils.validation import _deprecate_positional_args
 
 class MLPClassifier(afClassifierMixin, BaseMultilayerPerceptron):
     """Multi-layer Perceptron classifier.
@@ -215,7 +215,7 @@ class MLPClassifier(afClassifierMixin, BaseMultilayerPerceptron):
         X, y = self._validate_data(X, y, accept_sparse=['csr', 'csc'],
                                    multi_output=True)
         # if y.ndim == 2 and y.shape[1] == 1:
-        #y = column_or_1d(y, warn=True)
+        # y = column_or_1d(y, warn=True)
         if y.ndim == 2 and y.dims(1) == 1:
             y = column_or_1d(y, warn=True)
 
