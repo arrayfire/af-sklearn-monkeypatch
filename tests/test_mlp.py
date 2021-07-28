@@ -29,4 +29,4 @@ def test_afsklearn_mlp() -> None:
 
 if __name__ == "__main__":
     test_afsklearn_mlp()
-    # test_sklearn_mlp()
+    test_sklearn_mlp()

@@ -26,5 +26,5 @@ def test_afsklearn() -> None:
 
 
 if __name__ == "__main__":
-    # test_afsklearn()
+    test_afsklearn()
     test_sklearn()
