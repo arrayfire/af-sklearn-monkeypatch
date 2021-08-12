@@ -1,12 +1,13 @@
-from afsklearn.patcher import Patcher
+import numpy as np
 
+from afsklearn.patcher import Patcher
 from . import measure_time
 
 
 def sklearn_example() -> None:
     from sklearn.preprocessing import OneHotEncoder
     enc = OneHotEncoder(handle_unknown='ignore')
-    X = [['Male', 1], ['Female', 3], ['Female', 2]]
+    X = np.array([['Male', 1], ['Female', 3], ['Female', 2]])
     enc.fit(X)
 
 

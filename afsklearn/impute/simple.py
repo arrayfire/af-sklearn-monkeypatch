@@ -2,8 +2,9 @@ import numbers
 import warnings
 from collections import Counter
 
-import numpy as np
+import numpy as np  # FIXME
 import numpy.ma as ma
+import arrayfire as af
 from scipy import sparse as sp
 from scipy import stats
 from sklearn.utils.validation import FLOAT_DTYPES, _deprecate_positional_args
@@ -242,9 +243,9 @@ class SimpleImputer(_afBaseImputer):
         """Fit the transformer on sparse data."""
         missing_mask = _get_mask(X, missing_values)
         mask_data = missing_mask.data
-        n_implicit_zeros = X.shape[0] - np.diff(X.indptr)
+        n_implicit_zeros = X.shape[0] - af.diff(X.indptr)
 
-        statistics = np.empty(X.shape[1])
+        statistics = af.empty(X.shape[1])
 
         if strategy == "constant":
             # for constant strategy, self.statistcs_ is used to store
@@ -311,12 +312,12 @@ class SimpleImputer(_afBaseImputer):
             mask = missing_mask.transpose()
 
             if X.dtype.kind == "O":
-                most_frequent = np.empty(X.shape[0], dtype=object)
+                most_frequent = af.empty(X.shape[0], dtype=object)
             else:
-                most_frequent = np.empty(X.shape[0])
+                most_frequent = af.empty(X.shape[0])
 
             for i, (row, row_mask) in enumerate(zip(X[:], mask[:])):
-                row_mask = np.logical_not(row_mask).astype(bool)
+                row_mask = af.logical_not(row_mask).astype(bool)
                 row = row[row_mask]
                 most_frequent[i] = _most_frequent(row, np.nan, 0)
 
@@ -379,7 +380,7 @@ class SimpleImputer(_afBaseImputer):
                     mask = _get_mask(X.data, self.missing_values)
                 indexes = np.repeat(
                     np.arange(len(X.indptr) - 1, dtype=int),
-                    np.diff(X.indptr))[mask]
+                    af.diff(X.indptr))[mask]
 
                 X.data[mask] = valid_statistics[indexes].astype(X.dtype, copy=False)
         else:

@@ -1,6 +1,7 @@
 from abc import ABCMeta, abstractmethod
 from warnings import warn
 
+import arrayfire as af
 import numpy as np  # FIXME
 from scipy.sparse import csc_matrix, issparse
 from sklearn.utils._tags import _safe_tags
@@ -37,7 +38,7 @@ class afSelectorMixin(afTransformerMixin, metaclass=ABCMeta):
             values are indices into the input feature vector.
         """
         mask = self._get_support_mask()
-        return mask if not indices else np.where(mask)[0]
+        return mask if not indices else af.where(mask)[0]
 
     @abstractmethod
     def _get_support_mask(self):
@@ -97,7 +98,7 @@ class afSelectorMixin(afTransformerMixin, metaclass=ABCMeta):
             # insert additional entries in indptr:
             # e.g. if transform changed indptr from [0 2 6 7] to [0 2 3]
             # col_nonzeros here will be [2 0 1] so indptr becomes [0 2 2 3]
-            it = self.inverse_transform(np.diff(X.indptr).reshape(1, -1))
+            it = self.inverse_transform(af.diff1(X.indptr).reshape(1, -1))
             col_nonzeros = it.ravel()
             indptr = np.concatenate([[0], np.cumsum(col_nonzeros)])
             Xt = csc_matrix((X.data, X.indices, indptr),

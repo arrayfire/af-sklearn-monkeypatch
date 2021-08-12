@@ -11,8 +11,7 @@ from ..base import afBaseEstimator, afTransformerMixin
 
 
 def _check_inputs_dtype(X, missing_values):
-    if (X.dtype.kind in ("f", "i", "u") and
-            not isinstance(missing_values, numbers.Real)):
+    if (X.dtype.kind in ("f", "i", "u") and not isinstance(missing_values, numbers.Real)):
         raise ValueError("'X' and 'missing_values' types are expected to be"
                          " both numerical. Got X.dtype={} and "
                          " type(missing_values)={}."
@@ -55,7 +54,7 @@ class _afBaseImputer(afTransformerMixin, afBaseEstimator):
         if not self.add_indicator:
             return X_imputed
 
-        hstack = sp.hstack if sp.issparse(X_imputed) else np.hstack
+        hstack = sp.hstack if sp.issparse(X_imputed) else af.hstack
         if X_indicator is None:
             raise ValueError(
                 "Data from the missing indicator are not provided. Call "
@@ -125,8 +124,7 @@ class MissingIndicator(afTransformerMixin, afBaseEstimator):
            [False, False]])
     """
     @_deprecate_positional_args
-    def __init__(self, *, missing_values=np.nan, features="missing-only",
-                 sparse="auto", error_on_new=True):
+    def __init__(self, *, missing_values=np.nan, features="missing-only", sparse="auto", error_on_new=True):
         self.missing_values = missing_values
         self.features = features
         self.sparse = sparse
@@ -187,9 +185,8 @@ class MissingIndicator(afTransformerMixin, afBaseEstimator):
             force_all_finite = True
         else:
             force_all_finite = "allow-nan"
-        X = self._validate_data(X, reset=in_fit,
-                                accept_sparse=('csc', 'csr'), dtype=None,
-                                force_all_finite=force_all_finite)
+        X = self._validate_data(
+            X, reset=in_fit, accept_sparse=('csc', 'csr'), dtype=None, force_all_finite=force_all_finite)
         _check_inputs_dtype(X, self.missing_values)
         if X.dtype.kind not in ("i", "u", "f", "O"):
             raise ValueError("MissingIndicator does not support data with "
@@ -227,8 +224,7 @@ class MissingIndicator(afTransformerMixin, afBaseEstimator):
         """
         if precomputed:
             if not (hasattr(X, 'dtype') and X.dtype.kind == 'b'):
-                raise ValueError("precomputed is True but the input data is "
-                                 "not a mask")
+                raise ValueError("precomputed is True but the input data is not a mask")
             self._precomputed = True
         else:
             self._precomputed = False
@@ -244,8 +240,7 @@ class MissingIndicator(afTransformerMixin, afBaseEstimator):
             raise ValueError("'features' has to be either 'missing-only' or "
                              "'all'. Got {} instead.".format(self.features))
 
-        if not ((isinstance(self.sparse, str) and
-                self.sparse == "auto") or isinstance(self.sparse, bool)):
+        if not ((isinstance(self.sparse, str) and self.sparse == "auto") or isinstance(self.sparse, bool)):
             raise ValueError("'sparse' has to be a boolean or 'auto'. "
                              "Got {!r} instead.".format(self.sparse))
 

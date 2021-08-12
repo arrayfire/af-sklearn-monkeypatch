@@ -1,4 +1,5 @@
 import numpy as np  # FIXME
+import arrayfire as af
 
 from .._sparsefuncs import mean_variance_axis, min_max_axis
 from .._validation import check_is_fitted
@@ -53,9 +54,7 @@ class VarianceThreshold(afSelectorMixin, afBaseEstimator):
         -------
         self
         """
-        X = self._validate_data(X, accept_sparse=('csr', 'csc'),
-                                dtype=np.float64,
-                                force_all_finite='allow-nan')
+        X = self._validate_data(X, accept_sparse=('csr', 'csc'), dtype=af.Dtype.f64, force_all_finite='allow-nan')
 
         if hasattr(X, "toarray"):   # sparse matrix
             _, self.variances_ = mean_variance_axis(X, axis=0)

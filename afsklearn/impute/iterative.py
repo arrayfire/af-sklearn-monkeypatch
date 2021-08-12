@@ -1,4 +1,4 @@
-import time
+from time import time
 import warnings
 
 import numpy as np  # FIXME
@@ -250,10 +250,8 @@ class IterativeImputer(_afBaseImputer):
 
         missing_row_mask = mask_missing_values[:, feat_idx]
         if fit_mode:
-            X_train = _safe_indexing(X_filled[:, neighbor_feat_idx],
-                                     ~missing_row_mask)
-            y_train = _safe_indexing(X_filled[:, feat_idx],
-                                     ~missing_row_mask)
+            X_train = _safe_indexing(X_filled[:, neighbor_feat_idx], ~missing_row_mask)
+            y_train = _safe_indexing(X_filled[:, feat_idx], ~missing_row_mask)
             estimator.fit(X_train, y_train)
 
         # if no missing values, don't predict
@@ -504,8 +502,7 @@ class IterativeImputer(_afBaseImputer):
         Xt : array-like, shape (n_samples, n_features)
             The imputed input data.
         """
-        self.random_state_ = getattr(self, "random_state_",
-                                     check_random_state(self.random_state))
+        self.random_state_ = getattr(self, "random_state_", check_random_state(self.random_state))
 
         if self.max_iter < 0:
             raise ValueError(
@@ -563,8 +560,7 @@ class IterativeImputer(_afBaseImputer):
 
         n_samples, n_features = Xt.shape
         if self.verbose > 0:
-            print("[IterativeImputer] Completing matrix with shape %s"
-                  % (X.shape,))
+            print("[IterativeImputer] Completing matrix with shape %s" % (X.shape,))
         start_t = time()
         if not self.sample_posterior:
             Xt_previous = Xt.copy()
@@ -576,15 +572,11 @@ class IterativeImputer(_afBaseImputer):
                 ordered_idx = self._get_ordered_idx(mask_missing_values)
 
             for feat_idx in ordered_idx:
-                neighbor_feat_idx = self._get_neighbor_feat_idx(n_features,
-                                                                feat_idx,
-                                                                abs_corr_mat)
+                neighbor_feat_idx = self._get_neighbor_feat_idx(n_features, feat_idx, abs_corr_mat)
                 Xt, estimator = self._impute_one_feature(
                     Xt, mask_missing_values, feat_idx, neighbor_feat_idx,
                     estimator=None, fit_mode=True)
-                estimator_triplet = _ImputerTriplet(feat_idx,
-                                                    neighbor_feat_idx,
-                                                    estimator)
+                estimator_triplet = _ImputerTriplet(feat_idx, neighbor_feat_idx, estimator)
                 self.imputation_sequence_.append(estimator_triplet)
 
             if self.verbose > 1:
@@ -593,22 +585,17 @@ class IterativeImputer(_afBaseImputer):
                       % (self.n_iter_, self.max_iter, time() - start_t))
 
             if not self.sample_posterior:
-                inf_norm = np.linalg.norm(Xt - Xt_previous, ord=np.inf,
-                                          axis=None)
+                inf_norm = np.linalg.norm(Xt - Xt_previous, ord=np.inf, axis=None)
                 if self.verbose > 0:
-                    print('[IterativeImputer] '
-                          'Change: {}, scaled tolerance: {} '.format(
-                              inf_norm, normalized_tol))
+                    print('[IterativeImputer] Change: {}, scaled tolerance: {} '.format(inf_norm, normalized_tol))
                 if inf_norm < normalized_tol:
                     if self.verbose > 0:
-                        print('[IterativeImputer] Early stopping criterion '
-                              'reached.')
+                        print('[IterativeImputer] Early stopping criterion reached.')
                     break
                 Xt_previous = Xt.copy()
         else:
             if not self.sample_posterior:
-                warnings.warn("[IterativeImputer] Early stopping criterion not"
-                              " reached.", ConvergenceWarning)
+                warnings.warn("[IterativeImputer] Early stopping criterion not reached.", ConvergenceWarning)
         Xt[~mask_missing_values] = X[~mask_missing_values]
         return super()._concatenate_indicator(Xt, X_indicator)
 

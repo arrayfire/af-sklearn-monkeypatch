@@ -501,7 +501,7 @@ def check_array(array, accept_sparse=False, *, accept_large_sparse=True,
     # store reference to original array to check if copy is needed when
     # function returns
     array_orig = array
-    return array  # TMP todo: perform checks for af::array
+    return array  # FIXME: perform checks for af::array
 
     # store whether originally we wanted numeric dtype
     dtype_numeric = isinstance(dtype, str) and dtype == "numeric"
