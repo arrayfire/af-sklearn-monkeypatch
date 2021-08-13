@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 from afsklearn.patcher import Patcher
 from . import measure_time
@@ -13,13 +14,15 @@ def sklearn_example() -> None:
     qt.fit_transform(X)
 
 
+@pytest.mark.parametrize("n_runs", range(5))
 @measure_time
-def test_sklearn() -> None:
+def test_sklearn(n_runs) -> None:
     sklearn_example()
 
 
+@pytest.mark.parametrize("n_runs", range(5))
 @measure_time
-def test_afsklearn() -> None:
+def test_afsklearn(n_runs) -> None:
     Patcher.patch("quantile_transformer")
     sklearn_example()
     Patcher.rollback("quantile_transformer")

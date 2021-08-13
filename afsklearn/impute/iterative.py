@@ -1,7 +1,7 @@
 from time import time
 import warnings
 
-import numpy as np  # FIXME
+import cupy as np  # FIXME
 from scipy import stats
 from sklearn.base import clone
 from sklearn.exceptions import ConvergenceWarning
@@ -250,6 +250,7 @@ class IterativeImputer(_afBaseImputer):
 
         missing_row_mask = mask_missing_values[:, feat_idx]
         if fit_mode:
+            X_filled = np.asarray(X_filled)
             X_train = _safe_indexing(X_filled[:, neighbor_feat_idx], ~missing_row_mask)
             y_train = _safe_indexing(X_filled[:, feat_idx], ~missing_row_mask)
             estimator.fit(X_train, y_train)
@@ -292,7 +293,7 @@ class IterativeImputer(_afBaseImputer):
 
         # update the feature
         X_filled[missing_row_mask, feat_idx] = imputed_values
-        return X_filled, estimator
+        return np.asarray(X_filled), estimator
 
     def _get_neighbor_feat_idx(self,
                                n_features,
@@ -345,7 +346,8 @@ class IterativeImputer(_afBaseImputer):
         ordered_idx : ndarray, shape (n_features,)
             The order in which to impute the features.
         """
-        frac_of_missing_values = mask_missing_values.mean(axis=0)
+        from numpy import argsort
+        frac_of_missing_values = np.asnumpy(mask_missing_values.mean(axis=0))
         if self.skip_complete:
             missing_values_idx = np.flatnonzero(frac_of_missing_values)
         else:
@@ -356,12 +358,10 @@ class IterativeImputer(_afBaseImputer):
             ordered_idx = missing_values_idx[::-1]
         elif self.imputation_order == 'ascending':
             n = len(frac_of_missing_values) - len(missing_values_idx)
-            ordered_idx = np.argsort(frac_of_missing_values,
-                                     kind='mergesort')[n:]
+            ordered_idx = argsort(frac_of_missing_values, kind='mergesort')[n:]
         elif self.imputation_order == 'descending':
             n = len(frac_of_missing_values) - len(missing_values_idx)
-            ordered_idx = np.argsort(frac_of_missing_values,
-                                     kind='mergesort')[n:][::-1]
+            ordered_idx = argsort(frac_of_missing_values, kind='mergesort')[n:][::-1]
         elif self.imputation_order == 'random':
             ordered_idx = missing_values_idx
             self.random_state_.shuffle(ordered_idx)
@@ -453,8 +453,9 @@ class IterativeImputer(_afBaseImputer):
             X_filled = self.initial_imputer_.transform(X)
 
         valid_mask = np.flatnonzero(np.logical_not(
-            np.isnan(self.initial_imputer_.statistics_)))
-        Xt = X[:, valid_mask]
+            np.isnan(np.asarray(self.initial_imputer_.statistics_))))
+        X = np.asarray(X)
+        Xt = np.asarray(X[:, valid_mask])
         mask_missing_values = mask_missing_values[:, valid_mask]
 
         return Xt, X_filled, mask_missing_values, X_missing_mask

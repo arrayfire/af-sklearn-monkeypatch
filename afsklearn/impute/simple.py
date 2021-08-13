@@ -2,17 +2,16 @@ import numbers
 import warnings
 from collections import Counter
 
-import cupy as np  # FIXME
-import numpy.ma as ma
 import arrayfire as af
+import numpy as np  # FIXME
+import numpy.ma as ma
 from scipy import sparse as sp
 from scipy import stats
 from sklearn.utils.validation import FLOAT_DTYPES, _deprecate_positional_args
 
-from .._mask import _get_mask
 from .._sparsefuncs import _get_median
 from .._validation import check_is_fitted, is_scalar_nan
-from .base import _afBaseImputer, _check_inputs_dtype
+from .base import _afBaseImputer, _check_inputs_dtype, _get_mask
 
 
 def _most_frequent(array, extra_value, n_repeat):

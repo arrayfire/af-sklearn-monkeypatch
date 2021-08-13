@@ -12,19 +12,19 @@ def sklearn_example() -> None:
     clf.fit(X, Y)
     print(f"Predict: {clf.predict([[-0.8, -1]])}")
 
-
-@measure_time
-def test_sklearn() -> None:
-    sklearn_example()
-
-
-@measure_time
-def test_afsklearn() -> None:
-    Patcher.patch("sgd_classifier")
-    sklearn_example()
-    Patcher.rollback("sgd_classifier")
+# FIXME Postponed
+# @measure_time
+# def test_sklearn() -> None:
+#     sklearn_example()
 
 
-if __name__ == "__main__":
-    test_afsklearn()
-    test_sklearn()
+# @measure_time
+# def test_afsklearn() -> None:
+#     Patcher.patch("sgd_classifier")
+#     sklearn_example()
+#     Patcher.rollback("sgd_classifier")
+
+
+# if __name__ == "__main__":
+#     test_afsklearn()
+#     test_sklearn()

@@ -3,7 +3,7 @@ from collections.abc import Sequence
 from itertools import chain
 
 import arrayfire as af
-import numpy as np
+import cupy as np
 import scipy.sparse as sp
 from scipy.sparse.base import spmatrix
 from sklearn.base import BaseEstimator, TransformerMixin

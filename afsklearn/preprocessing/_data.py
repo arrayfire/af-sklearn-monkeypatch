@@ -190,44 +190,6 @@ class QuantileTransformer(afTransformerMixin, afBaseEstimator):
             needs to be nonnegative. If a sparse matrix is provided,
             it will be converted into a sparse ``csc_matrix``.
         """
-#        n_samples, n_features = X.shape
-#        references = self.references_ * 100
-#
-#        self.quantiles_ = []
-#        for feature_idx in range(n_features):
-#            column_nnz_data = X.data[X.indptr[feature_idx]:
-#                                     X.indptr[feature_idx + 1]]
-#            if len(column_nnz_data) > self.subsample:
-#                column_subsample = (self.subsample * len(column_nnz_data) //
-#                                    n_samples)
-#                if self.ignore_implicit_zeros:
-#                    column_data = np.zeros(shape=column_subsample,
-#                                           dtype=X.dtype)
-#                else:
-#                    column_data = np.zeros(shape=self.subsample, dtype=X.dtype)
-#                column_data[:column_subsample] = random_state.choice(
-#                    column_nnz_data, size=column_subsample, replace=False)
-#            else:
-#                if self.ignore_implicit_zeros:
-#                    column_data = np.zeros(shape=len(column_nnz_data),
-#                                           dtype=X.dtype)
-#                else:
-#                    column_data = np.zeros(shape=n_samples, dtype=X.dtype)
-#                column_data[:len(column_nnz_data)] = column_nnz_data
-#
-#            if not column_data.size:
-#                # if no nnz, an error will be raised for computing the
-#                # quantiles. Force the quantiles to be zeros.
-#                self.quantiles_.append([0] * len(references))
-#            else:
-#                self.quantiles_.append(
-#                        np.nanpercentile(column_data, references))
-#        self.quantiles_ = np.transpose(self.quantiles_)
-#        # due to floating-point precision error in `np.nanpercentile`,
-#        # make sure the quantiles are monotonically increasing
-#        # Upstream issue in numpy:
-#        # https://github.com/numpy/numpy/issues/14685
-#        self.quantiles_ = np.maximum.accumulate(self.quantiles_)
 
     def fit(self, X, y=None):
         """Compute the quantiles used for transforming.
@@ -443,7 +405,7 @@ class QuantileTransformer(afTransformerMixin, afBaseEstimator):
         if (not accept_sparse_negative and not self.ignore_implicit_zeros
                 and (sparse.issparse(X) and np.any(X.data < 0))):
             raise ValueError('QuantileTransformer only accepts'
-                                ' non-negative sparse matrices.')
+                             ' non-negative sparse matrices.')
 
         # check the output distribution
         if self.output_distribution not in ('normal', 'uniform'):
