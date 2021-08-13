@@ -1,5 +1,5 @@
-import numpy as np
 import arrayfire as af
+import cupy as np
 from scipy import sparse as sp
 
 from ._validation import _object_dtype_isnan, is_scalar_nan
@@ -8,7 +8,7 @@ from ._validation import _object_dtype_isnan, is_scalar_nan
 def _get_dense_mask(X, value_to_mask):
     if is_scalar_nan(value_to_mask):
         if X.dtype.kind == "f":
-            Xt = np.isnan(X)
+            Xt = af.isnan(af.to_array(X))
         elif X.dtype.kind in ("i", "u"):
             # can't have NaNs in integer array.
             Xt = np.zeros(X.shape, dtype=bool)

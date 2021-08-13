@@ -4,7 +4,7 @@ from inspect import isclass
 from itertools import compress
 
 import arrayfire as af
-import numpy as np
+import cupy as np
 import scipy.sparse as sp
 from sklearn._config import get_config as _get_config
 from sklearn.exceptions import DataConversionWarning, NotFittedError

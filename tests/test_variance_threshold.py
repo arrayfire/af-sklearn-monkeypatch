@@ -4,7 +4,7 @@ import pytest
 from afsklearn.patcher import Patcher
 from . import measure_time
 
-X = np.array([[0, 2, 0, 3], [0, 1, 4, 3], [0, 1, 1, 3]])
+X = np.random.randint(10, size=(25000, 1000))
 
 
 def sklearn_example() -> None:

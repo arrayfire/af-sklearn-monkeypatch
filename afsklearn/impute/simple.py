@@ -2,7 +2,7 @@ import numbers
 import warnings
 from collections import Counter
 
-import numpy as np  # FIXME
+import cupy as np  # FIXME
 import numpy.ma as ma
 import arrayfire as af
 from scipy import sparse as sp

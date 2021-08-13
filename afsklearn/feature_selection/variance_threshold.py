@@ -1,4 +1,4 @@
-import numpy as np  # FIXME
+import cupy as np  # FIXME
 import arrayfire as af
 
 from .._sparsefuncs import mean_variance_axis, min_max_axis

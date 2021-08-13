@@ -277,8 +277,7 @@ class QuantileTransformer(afTransformerMixin, afBaseEstimator):
         rng = check_random_state(self.random_state)
 
         # Create the quantiles of reference
-        self.references_ = np.linspace(0, 1, self.n_quantiles_,
-                                       endpoint=True)
+        self.references_ = np.linspace(0, 1, self.n_quantiles_, endpoint=True)
         if sparse.issparse(X):
             self._sparse_fit(X, rng)
         else:
@@ -441,11 +440,10 @@ class QuantileTransformer(afTransformerMixin, afBaseEstimator):
                                 force_all_finite='allow-nan')
         # we only accept positive sparse matrix when ignore_implicit_zeros is
         # false and that we call fit or transform.
-        with np.errstate(invalid='ignore'):  # hide NaN comparison warnings
-            if (not accept_sparse_negative and not self.ignore_implicit_zeros
-                    and (sparse.issparse(X) and np.any(X.data < 0))):
-                raise ValueError('QuantileTransformer only accepts'
-                                 ' non-negative sparse matrices.')
+        if (not accept_sparse_negative and not self.ignore_implicit_zeros
+                and (sparse.issparse(X) and np.any(X.data < 0))):
+            raise ValueError('QuantileTransformer only accepts'
+                                ' non-negative sparse matrices.')
 
         # check the output distribution
         if self.output_distribution not in ('normal', 'uniform'):

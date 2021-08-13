@@ -2,7 +2,7 @@ from abc import ABCMeta, abstractmethod
 from warnings import warn
 
 import arrayfire as af
-import numpy as np  # FIXME
+import cupy as np  # FIXME
 from scipy.sparse import csc_matrix, issparse
 from sklearn.utils._tags import _safe_tags
 
@@ -65,7 +65,7 @@ class afSelectorMixin(afTransformerMixin, metaclass=ABCMeta):
         # note: we use _safe_tags instead of _get_tags because this is a
         # public Mixin.
         X = check_array(
-            X,
+            np.array(X),
             dtype=None,
             accept_sparse="csr",
             force_all_finite=not _safe_tags(self, key="allow_nan"),
