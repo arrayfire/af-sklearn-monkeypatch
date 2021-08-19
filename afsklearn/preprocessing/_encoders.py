@@ -1,4 +1,5 @@
-import numpy as np  # FIXME
+import arrayfire as af
+import cupy as np  # FIXME
 from scipy import sparse
 from sklearn.utils import _deprecate_positional_args
 
@@ -74,16 +75,16 @@ class _BaseEncoder(afTransformerMixin, afBaseEstimator):
             if self.categories == 'auto':
                 cats = _unique(Xi)
             else:
-                cats = np.array(self.categories[i], dtype=Xi.dtype)
+                cats = af.to_array(self.categories[i], dtype=Xi.dtype)
                 if Xi.dtype.kind not in 'OUS':
-                    sorted_cats = np.sort(cats)
+                    sorted_cats = af.sort(cats)
                     error_msg = ("Unsorted categories are not "
                                  "supported for numerical categories")
                     # if there are nans, nan should be the last element
-                    stop_idx = -1 if np.isnan(sorted_cats[-1]) else None
-                    if (np.any(sorted_cats[:stop_idx] != cats[:stop_idx]) or
-                        (np.isnan(sorted_cats[-1]) and
-                         not np.isnan(sorted_cats[-1]))):
+                    stop_idx = -1 if af.isnan(sorted_cats[-1]) else None
+                    if (af.any_true(sorted_cats[:stop_idx] != cats[:stop_idx]) or
+                        (af.isnan(sorted_cats[-1]) and
+                         not af.isnan(sorted_cats[-1]))):
                         raise ValueError(error_msg)
 
                 if handle_unknown == 'error':
@@ -305,7 +306,7 @@ class OneHotEncoder(_BaseEncoder):
             if self.drop == 'first':
                 return np.zeros(len(self.categories_), dtype=object)
             elif self.drop == 'if_binary':
-                return np.array([0 if len(cats) == 2 else None
+                return af.to_array([0 if len(cats) == 2 else None
                                 for cats in self.categories_], dtype=object)
             else:
                 msg = (
@@ -316,7 +317,7 @@ class OneHotEncoder(_BaseEncoder):
 
         else:
             try:
-                drop_array = np.asarray(self.drop, dtype=object)
+                drop_array = af.to_array(self.drop, dtype=object)
                 droplen = len(drop_array)
             except (ValueError, TypeError):
                 msg = (
@@ -333,7 +334,7 @@ class OneHotEncoder(_BaseEncoder):
             for col_idx, (val, cat_list) in enumerate(zip(drop_array,
                                                           self.categories_)):
                 if not is_scalar_nan(val):
-                    drop_idx = np.where(cat_list == val)[0]
+                    drop_idx = af.where(cat_list == val)[0]
                     if drop_idx.size:  # found drop idx
                         drop_indices.append(drop_idx[0])
                     else:
@@ -356,7 +357,7 @@ class OneHotEncoder(_BaseEncoder):
                                ["Category: {}, Feature: {}".format(c, v)
                                 for c, v in missing_drops])))
                 raise ValueError(msg)
-            return np.array(drop_indices, dtype=object)
+            return af.to_array(drop_indices, dtype=object)
 
     def fit(self, X, y=None):
         """
@@ -449,7 +450,7 @@ class OneHotEncoder(_BaseEncoder):
 
         indptr = np.empty(n_samples + 1, dtype=int)
         indptr[0] = 0
-        np.sum(X_mask, axis=1, out=indptr[1:])
+        af.sum(X_mask, axis=1, out=indptr[1:])
         np.cumsum(indptr[1:], out=indptr[1:])
         data = np.ones(indptr[-1])
 
@@ -519,15 +520,15 @@ class OneHotEncoder(_BaseEncoder):
                 continue
             sub = X[:, j:j + n_categories]
             # for sparse X argmax returns 2D matrix, ensure 1D array
-            labels = np.asarray(sub.argmax(axis=1)).flatten()
+            labels = af.to_array(sub.argmax(axis=1)).flatten()
             X_tr[:, i] = cats[labels]
             if self.handle_unknown == 'ignore':
-                unknown = np.asarray(sub.sum(axis=1) == 0).flatten()
+                unknown = af.to_array(sub.sum(axis=1) == 0).flatten()
                 # ignored unknown categories: we have a row of all zero
                 if unknown.any():
                     found_unknown[i] = unknown
             else:
-                dropped = np.asarray(sub.sum(axis=1) == 0).flatten()
+                dropped = af.to_array(sub.sum(axis=1) == 0).flatten()
                 if dropped.any():
                     if self.drop_idx_ is None:
                         all_zero_samples = np.flatnonzero(dropped)
@@ -585,4 +586,4 @@ class OneHotEncoder(_BaseEncoder):
                 names.pop(self.drop_idx_[i])
             feature_names.extend(names)
 
-        return np.array(feature_names, dtype=object)
+        return af.to_array(feature_names, dtype=object)
