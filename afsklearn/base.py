@@ -41,22 +41,64 @@ class afBaseEstimator(BaseEstimator):
         row_ind, col_ind = self.get_indices(i)
         return data[row_ind[:, np.newaxis], col_ind]
 
-    def _validate_data(self, X, y=None, reset=True,
+    def _check_n_features(self, X, reset):
+        """Set the `n_features_in_` attribute, or check against it.
+        Parameters
+        ----------
+        X : {ndarray, sparse matrix} of shape (n_samples, n_features)
+            The input samples.
+        reset : bool
+            If True, the `n_features_in_` attribute is set to `X.shape[1]`.
+            If False and the attribute exists, then check that it is equal to
+            `X.shape[1]`. If False and the attribute does *not* exist, then
+            the check is skipped.
+            .. note::
+               It is recommended to call reset=True in `fit` and in the first
+               call to `partial_fit`. All other methods that validate `X`
+               should set `reset=False`.
+        """
+        n_features = X.shape[1]
+
+        if reset:
+            self.n_features_in_ = n_features
+            return
+
+        if not hasattr(self, "n_features_in_"):
+            # Skip this check if the expected number of expected input features
+            # was not recorded by calling fit first. This is typically the case
+            # for stateless transformers.
+            return
+
+        if n_features != self.n_features_in_:
+            raise ValueError(
+                f"X has {n_features} features, but {self.__class__.__name__} "
+                f"is expecting {self.n_features_in_} features as input.")
+
+    def _validate_data(self, X, y='no_validation', reset=True,
                        validate_separately=False, **check_params):
         """Validate input data and set or check the `n_features_in_` attribute.
-
         Parameters
         ----------
         X : {array-like, sparse matrix, dataframe} of shape \
                 (n_samples, n_features)
             The input samples.
-        y : array-like of shape (n_samples,), default=None
-            The targets. If None, `check_array` is called on `X` and
-            `check_X_y` is called otherwise.
+        y : array-like of shape (n_samples,), default='no_validation'
+            The targets.
+            - If `None`, `check_array` is called on `X`. If the estimator's
+              requires_y tag is True, then an error will be raised.
+            - If `'no_validation'`, `check_array` is called on `X` and the
+              estimator's requires_y tag is ignored. This is a default
+              placeholder and is never meant to be explicitly set.
+            - Otherwise, both `X` and `y` are checked with either `check_array`
+              or `check_X_y` depending on `validate_separately`.
         reset : bool, default=True
             Whether to reset the `n_features_in_` attribute.
             If False, the input will be checked for consistency with data
             provided when reset was last True.
+            .. note::
+               It is recommended to call reset=True in `fit` and in the first
+               call to `partial_fit`. All other methods that validate `X`
+               should set `reset=False`.
         validate_separately : False or tuple of dicts, default=False
             Only used if y is not None.
             If False, call validate_X_y(). Else, it must be a tuple of kwargs
@@ -65,7 +107,6 @@ class afBaseEstimator(BaseEstimator):
             Parameters passed to :func:`sklearn.utils.check_array` or
             :func:`sklearn.utils.check_X_y`. Ignored if validate_separately
             is not False.
-
         Returns
         -------
         out : {ndarray, sparse matrix} or tuple of these
@@ -78,6 +119,9 @@ class afBaseEstimator(BaseEstimator):
                     f"This {self.__class__.__name__} estimator "
                     f"requires y to be passed, but the target y is None."
                 )
+            X = check_array(X, **check_params)
+            out = X
+        elif isinstance(y, str) and y == 'no_validation':
             X = check_array(X, **check_params)
             out = X
         else:
@@ -97,6 +141,7 @@ class afBaseEstimator(BaseEstimator):
             self._check_n_features(X, reset=reset)
 
         return out
+
 
 # Class inheriting from TransformerMixin
 # all methods that touch np.array are replaced

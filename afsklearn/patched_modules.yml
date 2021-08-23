@@ -32,3 +32,8 @@ variance_threshold:
   name: VarianceThreshold
   module: sklearn.feature_selection
   module_patch: afsklearn.feature_selection.variance_threshold
+
+gaussian_random_projection:
+  name: GaussianRandomProjection
+  module: sklearn.random_projection
+  module_patch: afsklearn.random_projection
