@@ -36,20 +36,22 @@ To patch sklearn on import, please install the following package into the venv w
 pip install git+https://github.com/roaffix/autowrapt.git@afsklearn
 ```
 
+Also, to run the patch use the venv variable `AUTOWRAPT_BOOTSTRAP=afsklearn`, e.g., `AUTOWRAPT_BOOTSTRAP=afsklearn python -c "import sklearn"`
+
 --
 
 ## TODO
 
 - GradientBoosting
-- OneHotEncoder  - Anton
+- OneHotEncoder - Anton
 - RandomForest
 - SelectFWE
 - QuantileTransformer
 - ExtraTreesClassifier
-- Imputer  - Anton
+- Imputer - Anton
 - GenericUnivariateSelect
-- SGDClassifier  - Anton
-- LinearSVC  - Stef
-- LinearSVR  - Stef
-- LogisticRegression  - Stef
-- Var threshold  - Anton
+- SGDClassifier - Anton
+- LinearSVC - Stef
+- LinearSVR - Stef
+- LogisticRegression - Stef
+- Var threshold - Anton
