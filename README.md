@@ -28,6 +28,14 @@ To run with time measurements use the flag `-s`
 pytest test/test_mlp.py -s
 ```
 
+## Patch sklearn
+
+To patch sklearn on import, please install the following package into the venv with installed sklearn and afsklearn packages:
+
+```console
+pip install git+https://github.com/roaffix/autowrapt.git@afsklearn
+```
+
 --
 
 ## TODO
