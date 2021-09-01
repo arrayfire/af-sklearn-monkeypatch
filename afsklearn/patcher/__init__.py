@@ -1,13 +1,13 @@
 __all__ = ["Patcher"]
 
 import importlib
-from pathlib import Path
 from typing import Any, Optional
 
 from .. import patches_info
 
 # TODO: remove
 temporary_storage = {}
+
 
 class Patcher:
     @staticmethod
@@ -20,11 +20,16 @@ class Patcher:
         patch_config = patches_info[module_name]
         _apply_patch(patch_config["module"], patch_config["name"], None)
 
+    @staticmethod
     def patch_all():
-        raise NotImplemented
+        for p in patches_info:
+            Patcher.patch(p)
 
+    @staticmethod
     def rollback_all():
-        raise NotImplemented
+        for p in patches_info:
+            if p in temporary_storage:
+                Patcher.rollback(p)
 
 
 def _load_module(module_path: str) -> Any:
