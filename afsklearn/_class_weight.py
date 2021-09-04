@@ -1,5 +1,5 @@
 import numpy as np  # FIXME
-from sklearn.utils import _deprecate_positional_args
+from sklearn.utils.validation import _deprecate_positional_args
 
 
 @_deprecate_positional_args

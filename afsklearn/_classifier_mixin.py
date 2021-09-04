@@ -155,8 +155,7 @@ class afClassifierMixin:
         score : float
             Mean accuracy of self.predict(X) wrt. y.
         """
-        # return accuracy_score(y, self.predict(X), sample_weight=sample_weight)
-        return  # TMP
+        return accuracy_score(y, self.predict(X), sample_weight=sample_weight)
 
     def _more_tags(self):
         return {'requires_y': True}

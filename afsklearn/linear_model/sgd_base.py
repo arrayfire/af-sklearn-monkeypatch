@@ -2,7 +2,7 @@ import warnings
 from abc import ABCMeta, abstractmethod
 
 import numpy as np  # FIXME
-from joblib import Parallel
+from joblib import Parallel, delayed
 from sklearn.base import clone, is_classifier
 from sklearn.exceptions import ConvergenceWarning
 from sklearn.linear_model._base import SparseCoefMixin
@@ -12,7 +12,7 @@ from sklearn.linear_model._sgd_fast import (  # FIXME
 from sklearn.linear_model._stochastic_gradient import DEFAULT_EPSILON, LEARNING_RATE_TYPES, MAX_INT, PENALTY_TYPES
 from sklearn.model_selection import ShuffleSplit, StratifiedShuffleSplit
 from sklearn.utils import deprecated
-from sklearn.utils.fixes import _joblib_parallel_args, delayed
+from sklearn.utils.fixes import _joblib_parallel_args#, delayed
 from sklearn.utils.validation import _deprecate_positional_args
 
 from .._class_weight import compute_class_weight

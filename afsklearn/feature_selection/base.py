@@ -3,7 +3,7 @@ from warnings import warn
 
 import numpy as np  # FIXME
 from scipy.sparse import csc_matrix, issparse
-from sklearn.utils._tags import _safe_tags
+from sklearn.utils.estimator_checks import _safe_tags
 
 from .._mask import safe_mask
 from .._validation import check_array

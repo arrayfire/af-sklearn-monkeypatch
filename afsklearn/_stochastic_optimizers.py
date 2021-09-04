@@ -4,11 +4,14 @@
 # Authors: Jiyuan Qian <jq401@nyu.edu>
 # License: BSD 3 clause
 
-import time
-from math import sqrt
-
+import numpy as np
 import arrayfire as af
+import time
 
+def paddims2(dims):
+    if len(dims) > 1:
+        return (dims[0], dims[1])
+    return (dims[0], 1)
 
 class BaseOptimizer:
     """Base (Stochastic) gradient descent optimizer
@@ -40,8 +43,11 @@ class BaseOptimizer:
             model. So length should be aligned with params
         """
         updates = self._get_updates(grads)
-        for param, update in zip(self.params, updates):
-            param += update
+        #for param, update in zip(self.params, updates):
+            #param += update
+
+        for i in range(len(self.params)):
+            self.params[i] = self.params[i] + updates[i]
 
     def iteration_ends(self, time_step):
         """Perform update to learning rate and potentially other states at the
@@ -93,9 +99,6 @@ class SGDOptimizer(BaseOptimizer):
         Value of momentum used, must be larger than or equal to 0
     nesterov : bool, default=True
         Whether to use nesterov's momentum or not. Use nesterov's if True
-    power_t : float, default=0.5
-        Power of time step 't' in inverse scaling. See `lr_schedule` for
-        more details.
     Attributes
     ----------
     learning_rate : float
@@ -112,10 +115,11 @@ class SGDOptimizer(BaseOptimizer):
         self.momentum = momentum
         self.nesterov = nesterov
         self.power_t = power_t
+        self.velocities = [np.zeros_like(param) for param in params]
 
-        dims_list = [paddims2(param.dims()) for param in params]
-
-        self.velocities = [af.constant(0, dim[0], dim[1]) for dim in dims_list]
+        if params and isinstance(params[0], af.Array):
+            dims_list = [paddims2(param.dims()) for param in params]
+            self.velocities_af = [af.constant(0, dim[0], dim[1]) for dim in dims_list]
 
     def iteration_ends(self, time_step):
         """Perform updates to learning rate and potential other states at the
@@ -159,21 +163,29 @@ class SGDOptimizer(BaseOptimizer):
         updates : list, length = len(grads)
             The values to add to params
         """
-        updates = [self.momentum * velocity - self.learning_rate * grad
-                   for velocity, grad in zip(self.velocities, grads)]
-        self.velocities = updates
-
-        if self.nesterov:
+        if grads and not isinstance(grads[0], af.Array):
             updates = [self.momentum * velocity - self.learning_rate * grad
                        for velocity, grad in zip(self.velocities, grads)]
+            self.velocities = updates
 
-        return updates
+            if self.nesterov:
+                updates = [self.momentum * velocity - self.learning_rate * grad
+                           for velocity, grad in zip(self.velocities, grads)]
+            return updates
+
+        else:
+            updates = [None] * len(grads)
+            for i in range(len(grads)):
+                af.eval(grads[i], self.velocities_af[i])
+
+                updates[i] = self.momentum * self.velocities_af[i] - self.learning_rate * grads[i]
+                self.velocities_af[i] = updates[i]
+
+                if self.nesterov:
+                    updates[i] = self.momentum * self.velocities_af[i] - self.learning_rate * grads[i]
+            return updates
 
 
-def paddims2(dims):
-    if len(dims) > 1:
-        return (dims[0], dims[1])
-    return (dims[0], 1)
 
 
 class AdamOptimizer(BaseOptimizer):
@@ -184,7 +196,7 @@ class AdamOptimizer(BaseOptimizer):
     params : list, length = len(coefs_) + len(intercepts_)
         The concatenated list containing coefs_ and intercepts_ in MLP model.
         Used for initializing velocities and updating params
-    learning_rate_init : float, default=0.001
+    learning_rate_init : float, default=0.1
         The initial learning rate used. It controls the step-size in updating
         the weights
     beta_1 : float, default=0.9
@@ -220,11 +232,18 @@ class AdamOptimizer(BaseOptimizer):
         self.beta_2 = beta_2
         self.epsilon = epsilon
         self.t = 0
+        self.ms = [ np.zeros_like(param) for param in params]
+        self.vs = [ np.zeros_like(param) for param in params]
 
-        dims_list = [paddims2(param.dims()) for param in params]
-
-        self.ms = [af.constant(0, dim[0], dim[1]) for dim in dims_list]
-        self.vs = [af.constant(0, dim[0], dim[1]) for dim in dims_list]
+        if params and isinstance(params[0], af.Array):
+            dims_list = [paddims2(param.dims()) for param in params]
+            self.ms_af = [af.constant(0, dim[0], dim[1]) for dim in dims_list]
+            self.vs_af = [af.constant(0, dim[0], dim[1]) for dim in dims_list]
+        #self.ms_af = [ param.copy() for param in params]
+        #self.vs_af = [ param.copy() for param in params]
+        #for i in range(len(self.ms_af)):
+            #self.ms_af[i][:] = 0
+            #self.vs_af[i][:] = 0
 
     def _get_updates(self, grads):
         """Get the values used to update params with given gradients
@@ -239,15 +258,32 @@ class AdamOptimizer(BaseOptimizer):
             The values to add to params
         """
         self.t += 1
+        if grads and not isinstance(grads[0], af.Array):
+            self.ms = [self.beta_1 * m + (1 - self.beta_1) * grad
+                       for m, grad in zip(self.ms, grads)]
+            self.vs = [self.beta_2 * v + (1 - self.beta_2) * (grad ** 2)
+                       for v, grad in zip(self.vs, grads)]
+            self.learning_rate = (self.learning_rate_init *
+                                  np.sqrt(1 - self.beta_2 ** self.t) /
+                                  (1 - self.beta_1 ** self.t))
+            updates = [-self.learning_rate * m / (np.sqrt(v) + self.epsilon)
+                       for m, v in zip(self.ms, self.vs)]
+        else:
+            self.learning_rate = (self.learning_rate_init *
+                                  np.sqrt(1 - self.beta_2 ** self.t) /
+                                  (1 - self.beta_1 ** self.t))
 
-        self.ms = [self.beta_1 * m + (1.0 - self.beta_1) * grad
-                   for m, grad in zip(self.ms, grads)]
-        self.vs = [self.beta_2 * v + (1 - self.beta_2) * (grad * grad)
-                   for v, grad in zip(self.vs, grads)]  # slooow
-        self.learning_rate = (self.learning_rate_init *
-                              sqrt(1 - self.beta_2 ** self.t) /
-                              (1 - self.beta_1 ** self.t))
-        updates = [-self.learning_rate * m / (af.sqrt(v) + self.epsilon)
-                   for m, v in zip(self.ms, self.vs)]  # sloow
+            updates = [None] * len(self.ms_af)
+            for i in range(len(self.ms_af)):
+                af.eval(grads[i], self.ms_af[i], self.vs_af[i])
+                self.ms_af[i] = self.beta_1 * self.ms_af[i] + (1 - self.beta_1) * grads[i]
+                self.vs_af[i] = self.beta_2 * self.vs_af[i] + (1 - self.beta_2) * (grads[i] ** 2)
+                updates[i] = -self.learning_rate * self.ms_af[i] / (af.sqrt(self.vs_af[i]) + self.epsilon)
 
+            #self.ms_af = [self.beta_1 * m + (1 - self.beta_1) * grad
+                       #for m, grad in zip(self.ms_af, grads)]
+            #self.vs_af = [self.beta_2 * v + (1 - self.beta_2) * (grad ** 2)
+                       #for v, grad in zip(self.vs_af, grads)]
+            #updates = [-self.learning_rate * m / (af.sqrt(v) + self.epsilon)
+                       #for m, v in zip(self.ms_af, self.vs_af)]
         return updates

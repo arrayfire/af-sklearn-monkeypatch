@@ -3,8 +3,9 @@ import numpy as np
 from sklearn.utils.validation import _deprecate_positional_args
 
 from .._classifier_mixin import afClassifierMixin
-from .._validation import check_is_fitted, column_or_1d
+from .._validation import check_is_fitted, column_or_1d, check_X_y
 from ..base import afLabelBinarizer, unique_labels
+from sklearn.preprocessing import LabelBinarizer
 from .base import BaseMultilayerPerceptron
 
 
@@ -209,9 +210,35 @@ class MLPClassifier(afClassifierMixin, BaseMultilayerPerceptron):
             validation_fraction=validation_fraction,
             beta_1=beta_1, beta_2=beta_2, epsilon=epsilon,
             n_iter_no_change=n_iter_no_change, max_fun=max_fun)
-        print("done init")
 
     def _validate_input(self, X, y, incremental):
+        X, y = check_X_y(X, y, accept_sparse=['csr', 'csc', 'coo'],
+                         multi_output=True)
+        if y.ndim == 2 and y.shape[1] == 1:
+            y = column_or_1d(y, warn=True)
+
+        if not incremental:
+            self._label_binarizer = LabelBinarizer()
+            self._label_binarizer.fit(y)
+            self.classes_ = self._label_binarizer.classes_
+        elif self.warm_start:
+            classes = unique_labels(y)
+            if set(classes) != set(self.classes_):
+                raise ValueError("warm_start can only be used where `y` has "
+                                 "the same classes as in the previous "
+                                 "call to fit. Previously got %s, `y` has %s" %
+                                 (self.classes_, classes))
+        else:
+            classes = unique_labels(y)
+            if len(np.setdiff1d(classes, self.classes_, assume_unique=True)):
+                raise ValueError("`y` has classes not in `self.classes_`."
+                                 " `self.classes_` has %s. 'y' has %s." %
+                                 (self.classes_, classes))
+
+        y = self._label_binarizer.transform(y)
+        return X, y
+
+    def _validate_input_af(self, X, y, incremental):
         X, y = self._validate_data(X, y, accept_sparse=['csr', 'csc'],
                                    multi_output=True)
         # if y.ndim == 2 and y.shape[1] == 1:
@@ -257,7 +284,7 @@ class MLPClassifier(afClassifierMixin, BaseMultilayerPerceptron):
         if self.n_outputs_ == 1:
             y_pred = af.flat(y_pred)
 
-        return self._label_binarizer.inverse_transform(y_pred)
+        return self._label_binarizer.inverse_transform(y_pred.to_ndarray())#TODO: use afLabelBinarizer
 
     def fit(self, X, y):
         """Fit the model to data matrix X and target(s) y.

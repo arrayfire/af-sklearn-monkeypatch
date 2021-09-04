@@ -1,5 +1,7 @@
 import numbers
 import warnings
+from contextlib import suppress
+from numpy.core.numeric import ComplexWarning
 from inspect import isclass
 from itertools import compress
 
@@ -500,8 +502,10 @@ def check_array(array, accept_sparse=False, *, accept_large_sparse=True,
     """
     # store reference to original array to check if copy is needed when
     # function returns
-    array_orig = array
-    return array  # TMP todo: perform checks for af::array
+
+
+    #array_orig = array
+    #return array  # TMP todo: perform checks for af::array
 
     # store whether originally we wanted numeric dtype
     dtype_numeric = isinstance(dtype, str) and dtype == "numeric"
@@ -798,18 +802,42 @@ def check_X_y(X, y, accept_sparse=False, *, accept_large_sparse=True,
                     ensure_min_features=ensure_min_features,
                     estimator=estimator)
     if multi_output:
-        y = check_array(y, accept_sparse='csr', force_all_finite=True,
-                        ensure_2d=False, dtype=None)
+        y = check_array(y, 'csr', force_all_finite=True, ensure_2d=False,
+                        dtype=None)
     else:
         y = column_or_1d(y, warn=True)
         _assert_all_finite(y)
-    npdtype = typemap(y.dtype)
-    if y_numeric and npdtype == 'O':
-        y = y.astype(af.Dype.f64)
+    if y_numeric and y.dtype.kind == 'O':
+        y = y.astype(np.float64)
 
     check_consistent_length(X, y)
 
     return X, y
+
+#    if y is None:
+#        raise ValueError("y cannot be None")
+#
+#    X = check_array(X, accept_sparse=accept_sparse,
+#                    accept_large_sparse=accept_large_sparse,
+#                    dtype=dtype, order=order, copy=copy,
+#                    force_all_finite=force_all_finite,
+#                    ensure_2d=ensure_2d, allow_nd=allow_nd,
+#                    ensure_min_samples=ensure_min_samples,
+#                    ensure_min_features=ensure_min_features,
+#                    estimator=estimator)
+#    if multi_output:
+#        y = check_array(y, accept_sparse='csr', force_all_finite=True,
+#                        ensure_2d=False, dtype=None)
+#    else:
+#        y = column_or_1d(y, warn=True)
+#        _assert_all_finite(y)
+#    npdtype = typemap(y.dtype)
+#    if y_numeric and npdtype == 'O':
+#        y = y.astype(af.Dtype.f64)
+#
+#    check_consistent_length(X, y)
+#
+#    return X, y
 
 
 @_deprecate_positional_args

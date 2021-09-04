@@ -28,8 +28,8 @@ def safe_sparse_dot(a, b, *, dense_output=False):
             b = af.interop.from_ndarray(b)
 
         #TODO: check a&b type()?
-        if(a.type() == af.Dtype.f64):
-            ret = af.blas.matmul(a, b)
+        if a.type() == af.Dtype.f64 or b.type() == af.Dtype.f64:
+            ret = af.blas.matmul(a.as_type(af.Dtype.f64), b.as_type(af.Dtype.f64))
         else:
             ret = af.blas.matmul(a.as_type(af.Dtype.f32), b.as_type(af.Dtype.f32))
     else:

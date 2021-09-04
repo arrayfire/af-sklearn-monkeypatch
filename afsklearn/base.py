@@ -779,7 +779,7 @@ class afLabelBinarizer(LabelBinarizer):
         elif sp.issparse(y_inv):
             y_inv = y_inv.toarray()
 
-        af_yinv = af.from_ndarray(y_inv)
+        #af_yinv = af.from_ndarray(y_inv)
         return af_yinv
 
 

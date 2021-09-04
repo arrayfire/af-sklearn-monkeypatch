@@ -1,6 +1,6 @@
 import numpy as np  # FIXME
 from sklearn.linear_model._stochastic_gradient import DEFAULT_EPSILON
-from sklearn.utils import _deprecate_positional_args
+from sklearn.utils.validation import _deprecate_positional_args
 
 from .._validation import check_is_fitted
 from .sgd_base import afBaseSGDClassifier

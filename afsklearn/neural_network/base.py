@@ -4,23 +4,60 @@ from math import sqrt
 
 import arrayfire as af
 import numpy as np
+import scipy
 from sklearn.base import is_classifier
 from sklearn.exceptions import ConvergenceWarning
 from sklearn.model_selection import train_test_split
 from sklearn.utils import check_random_state, gen_batches, shuffle
+from sklearn.utils.optimize import _check_optimize_result
 
 from .._extmath import safe_sparse_dot
 from .._nn_utils import ACTIVATIONS, DERIVATIVES, LOSS_FUNCTIONS
 from .._stochastic_optimizers import AdamOptimizer, SGDOptimizer
 from .._validation import _safe_indexing, check_array
 from ..base import afBaseEstimator
+import time
 
 _STOCHASTIC_SOLVERS = ['sgd', 'adam']
 
-
 def _pack(coefs_, intercepts_):
     """Pack the parameters into a single vector."""
+    if isinstance(coefs_, af.Array): #TODO?
+        pass
     return np.hstack([l.ravel() for l in coefs_ + intercepts_])
+
+def af_type_matmulTN(a, b):
+    if a.type() == af.Dtype.f64 or b.type() == af.Dtype.f64:
+        ret = af.blas.matmulTN(a.as_type(af.Dtype.f64), b.as_type(af.Dtype.f64))
+    else:
+        ret = af.blas.matmulTN(a.as_type(af.Dtype.f32), b.as_type(af.Dtype.f32))
+    return ret
+
+def cvtArgsaToAf(X, y, activations, deltas, coef_grads, intercept_grads):
+    X_af = af.interop.from_ndarray(X)
+    y_af = af.interop.from_ndarray(y)
+
+    if activations and not isinstance(activations[0], af.Array):
+        activations_af = [af.interop.from_ndarray(a)  if a is not None else a for a in activations]
+    else:
+        activations_af = activations
+
+    if deltas and not isinstance(deltas[0], af.Array):
+        deltas_af = [af.interop.from_ndarray(a)  if a is not None else a for a in deltas]
+    else:
+        deltas_af = deltas
+
+    if coef_grads and not isinstance(coef_grads[0], af.Array):
+        coef_grads_af = [af.interop.from_ndarray(a)  if a is not None else a for a in coef_grads]
+    else:
+        coef_grads_af = coef_grads
+
+    if intercept_grads and not isinstance(intercept_grads[0], af.Array):
+        intercept_grads_af = [af.interop.from_ndarray(a)  if a is not None else a for a in intercept_grads]
+    else:
+        intercept_grads_af = intercept_grads
+
+    return X_af, y_af, activations_af, deltas_af, coef_grads_af, intercept_grads_af
 
 
 class BaseMultilayerPerceptron(afBaseEstimator, metaclass=ABCMeta):
@@ -60,15 +97,63 @@ class BaseMultilayerPerceptron(afBaseEstimator, metaclass=ABCMeta):
         self.n_iter_no_change = n_iter_no_change
         self.max_fun = max_fun
 
-#    def _unpack(self, packed_parameters):
-#        """Extract the coefficients and intercepts from packed_parameters."""
-#        for i in range(self.n_layers_ - 1):
-#            start, end, shape = self._coef_indptr[i]
-#            self.coefs_[i] = np.reshape(packed_parameters[start:end], shape)
-#
-#            start, end = self._intercept_indptr[i]
-#            self.intercepts_[i] = packed_parameters[start:end]
-#
+    def _unpack(self, packed_parameters):
+        """Extract the coefficients and intercepts from packed_parameters."""
+        for i in range(self.n_layers_ - 1):
+            start, end, shape = self._coef_indptr[i]
+            self.coefs_[i] = np.reshape(packed_parameters[start:end], shape)
+
+            start, end = self._intercept_indptr[i]
+            self.intercepts_[i] = packed_parameters[start:end]
+
+    def _forward_pass_af(self, activations):
+        """Perform a forward pass on the network by computing the values
+        of the neurons in the hidden layers and the output layer.
+
+        Parameters
+        ----------
+        activations : list, length = n_layers - 1
+            The ith element of the list holds the values of the ith layer.
+        """
+        hidden_activation = ACTIVATIONS[self.activation]
+        # Iterate over the hidden layers
+
+        if activations and not isinstance(activations[0], af.Array):
+            activations_af = [af.interop.from_ndarray(a)  if a is not None else a for a in activations]
+        else:
+            activations_af = activations
+
+        if self.coefs_ and not isinstance(self.coefs_[0], af.Array):
+            coefs_af = [af.interop.from_ndarray(c)  if c is not None else c for c in self.coefs_]
+        else:
+            coefs_af = self.coefs_
+
+        if self.intercepts_ and not isinstance(self.intercepts_[0], af.Array):
+            intercepts_af = [af.interop.from_ndarray(i)  if i is not None else i for i in self.intercepts_]
+        else:
+            intercepts_af = self.intercepts_
+
+
+        for i in range(self.n_layers_ - 1):
+            #activations_af[i + 1]  = af.matmul(activations_af[i], coefs_af[i])
+            activations_af[i + 1] = safe_sparse_dot(activations_af[i],
+                                                    coefs_af[i])
+            #activations_af[i + 1] += af.tile(intercepts_af[i], 1, activations_af[i+1].shape[0]).T
+            activations_af[i + 1] += af.tile(intercepts_af[i].T, activations_af[i+1].shape[0])
+
+            # For the hidden layers
+            if (i + 1) != (self.n_layers_ - 1):
+                activations_af[i + 1] = hidden_activation(activations_af[i + 1])
+
+        # For the last layer
+        output_activation = ACTIVATIONS[self.out_activation_]
+        activations_af[i + 1] = output_activation(activations_af[i + 1])
+
+        #self.coefs_ = coefs_af
+        #self.intercepts_ = intercepts_af
+
+        return activations_af
+
     def _forward_pass(self, activations):
         """Perform a forward pass on the network by computing the values
         of the neurons in the hidden layers and the output layer.
@@ -83,16 +168,19 @@ class BaseMultilayerPerceptron(afBaseEstimator, metaclass=ABCMeta):
         for i in range(self.n_layers_ - 1):
             activations[i + 1] = safe_sparse_dot(activations[i],
                                                  self.coefs_[i])
-            activations[i + 1] += af.tile(self.intercepts_[i].T, activations[i+1].dims()[0])
+            activations[i + 1] += af.tile(self.intercepts_[i].T, activations[i+1].shape[0])
 
             # For the hidden layers
             if (i + 1) != (self.n_layers_ - 1):
                 activations[i + 1] = hidden_activation(activations[i + 1])
                 #activations[i + 1] = af.tile(self.intercepts_[i].T, activations[i+1].dims()[0])
 
+
+
         # For the last layer
         output_activation = ACTIVATIONS[self.out_activation_]
         activations[i + 1] = output_activation(activations[i + 1])
+
 
         return activations
 
@@ -111,57 +199,36 @@ class BaseMultilayerPerceptron(afBaseEstimator, metaclass=ABCMeta):
 
         return coef_grads, intercept_grads
 
-#    def _loss_grad_lbfgs(self, packed_coef_inter, X, y, activations, deltas,
-#                         coef_grads, intercept_grads):
-#        """Compute the MLP loss function and its corresponding derivatives
-#        with respect to the different parameters given in the initialization.
-#        Returned gradients are packed in a single vector so it can be used
-#        in lbfgs
-#        Parameters
-#        ----------
-#        packed_coef_inter : ndarray
-#            A vector comprising the flattened coefficients and intercepts.
-#        X : {array-like, sparse matrix} of shape (n_samples, n_features)
-#            The input data.
-#        y : ndarray of shape (n_samples,)
-#            The target values.
-#        activations : list, length = n_layers - 1
-#            The ith element of the list holds the values of the ith layer.
-#        deltas : list, length = n_layers - 1
-#            The ith element of the list holds the difference between the
-#            activations of the i + 1 layer and the backpropagated error.
-#            More specifically, deltas are gradients of loss with respect to z
-#            in each layer, where z = wx + b is the value of a particular layer
-#            before passing through the activation function
-#        coef_grads : list, length = n_layers - 1
-#            The ith element contains the amount of change used to update the
-#            coefficient parameters of the ith layer in an iteration.
-#        intercept_grads : list, length = n_layers - 1
-#            The ith element contains the amount of change used to update the
-#            intercept parameters of the ith layer in an iteration.
-#        Returns
-#        -------
-#        loss : float
-#        grad : array-like, shape (number of nodes of all layers,)
-#        """
-#        self._unpack(packed_coef_inter)
-#        loss, coef_grads, intercept_grads = self._backprop(
-#            X, y, activations, deltas, coef_grads, intercept_grads)
-#        grad = _pack(coef_grads, intercept_grads)
-#        return loss, grad
-#
-    def _backprop(self, X, y, activations, deltas, coef_grads,
-                  intercept_grads):
+    def _compute_loss_grad_af(self, layer, n_samples, activations, deltas,
+                              coef_grads, intercept_grads):
+        """Compute the gradient of loss with respect to coefs and intercept for
+        specified layer.
+
+        This function does backpropagation for the specified one layer.
+        """
+        coef_grads[layer] = af_type_matmulTN(activations[layer], deltas[layer])
+        coef_grads[layer] += (self.alpha * self.coefs_[layer])
+        coef_grads[layer] /= n_samples
+
+        intercept_grads[layer] = af.flat(af.mean(deltas[layer], dim=0))
+        return coef_grads, intercept_grads
+
+    def _loss_grad_lbfgs(self, packed_coef_inter, X, y, activations, deltas,
+                         coef_grads, intercept_grads):
         """Compute the MLP loss function and its corresponding derivatives
-        with respect to each parameter: weights and bias vectors.
+        with respect to the different parameters given in the initialization.
+        Returned gradients are packed in a single vector so it can be used
+        in lbfgs
         Parameters
         ----------
+        packed_coef_inter : ndarray
+            A vector comprising the flattened coefficients and intercepts.
         X : {array-like, sparse matrix} of shape (n_samples, n_features)
             The input data.
         y : ndarray of shape (n_samples,)
             The target values.
         activations : list, length = n_layers - 1
-             The ith element of the list holds the values of the ith layer.
+            The ith element of the list holds the values of the ith layer.
         deltas : list, length = n_layers - 1
             The ith element of the list holds the difference between the
             activations of the i + 1 layer and the backpropagated error.
@@ -177,23 +244,84 @@ class BaseMultilayerPerceptron(afBaseEstimator, metaclass=ABCMeta):
         Returns
         -------
         loss : float
+        grad : array-like, shape (number of nodes of all layers,)
+        """
+        self._unpack(packed_coef_inter)
+        #naive conversion, TODO: avoid repeated mem-transfers
+        X_af, y_af, activations_af, deltas_af, coef_grads_af, intercept_grads_af =\
+        cvtArgsaToAf(X, y, activations, deltas, coef_grads, intercept_grads)
+        if self.coefs_ and not isinstance(self.coefs_[0], af.Array):
+            self.coefs_ = [af.interop.from_ndarray(c)  if c is not None else c for c in self.coefs_]
+        if self.intercepts_ and not isinstance(self.intercepts_[0], af.Array):
+            self.intercepts_ = [af.interop.from_ndarray(i)  if i is not None else i for i in self.intercepts_]
+
+        loss, coef_grads, intercept_grads = self._backprop(
+            X_af, y_af, activations_af, deltas_af, coef_grads_af, intercept_grads_af)
+            #X, y, activations, deltas, coef_grads, intercept_grads)
+
+        #conversion back
+        coef_grads = [a.to_ndarray() if a is not None else a for a in coef_grads]
+        intercept_grads = [np.squeeze(a.to_ndarray()) if a is not None else a for a in intercept_grads]
+
+        grad = _pack(coef_grads, intercept_grads)
+        return loss, grad
+
+    def _backprop(self, X, y, activations, deltas, coef_grads,
+                  intercept_grads):
+        """Compute the MLP loss function and its corresponding derivatives
+        with respect to each parameter: weights and bias vectors.
+
+        Parameters
+        ----------
+        X : {array-like, sparse matrix} of shape (n_samples, n_features)
+            The input data.
+
+        y : ndarray of shape (n_samples,)
+            The target values.
+
+        activations : list, length = n_layers - 1
+             The ith element of the list holds the values of the ith layer.
+
+        deltas : list, length = n_layers - 1
+            The ith element of the list holds the difference between the
+            activations of the i + 1 layer and the backpropagated error.
+            More specifically, deltas are gradients of loss with respect to z
+            in each layer, where z = wx + b is the value of a particular layer
+            before passing through the activation function
+
+        coef_grads : list, length = n_layers - 1
+            The ith element contains the amount of change used to update the
+            coefficient parameters of the ith layer in an iteration.
+
+        intercept_grads : list, length = n_layers - 1
+            The ith element contains the amount of change used to update the
+            intercept parameters of the ith layer in an iteration.
+
+        Returns
+        -------
+        loss : float
         coef_grads : list, length = n_layers - 1
         intercept_grads : list, length = n_layers - 1
         """
         n_samples = X.shape[0]
 
+        #y_af = af.interop.from_ndarray(y).as_type(af.Dtype.s32) if \
+                        #not isinstance(y,af.Array) else y
+        y_af = af.interop.from_ndarray(y).as_type(af.Dtype.f32) if \
+                        not isinstance(y,af.Array) else y.as_type(af.Dtype.f32)
+
         # Forward propagate
-        activations = self._forward_pass(activations)
+        # will convert grads(coefs_ + intercepts_) to af.Array if needed
+        activations = self._forward_pass_af(activations)
 
         # Get loss
         loss_func_name = self.loss
         if loss_func_name == 'log_loss' and self.out_activation_ == 'logistic':
             loss_func_name = 'binary_log_loss'
+        loss = LOSS_FUNCTIONS[loss_func_name](y_af.as_type(af.Dtype.f32), activations[-1])
 
-        loss = LOSS_FUNCTIONS[loss_func_name](y, activations[-1])
         # Add L2 regularization term to loss
-        values = np.sum(
-            np.array([af.dot(af.flat(s), af.flat(s), return_scalar=True) for s in self.coefs_]))
+        values = np.sum(np.array([af.dot(af.flat(s), af.flat(s)).scalar() for s in self.coefs_]))
         loss += (0.5 * self.alpha) * values / n_samples
 
         # Backward propagate
@@ -203,19 +331,22 @@ class BaseMultilayerPerceptron(afBaseEstimator, metaclass=ABCMeta):
         # combinations of output activation and loss function:
         # sigmoid and binary cross entropy, softmax and categorical cross
         # entropy, and identity with squared loss
-        deltas[last] = af.to_array(activations[-1]) - y
+
+        deltas[last] = activations[-1] - y_af.as_type(af.Dtype.f32)
 
         # Compute gradient for the last layer
-        coef_grads, intercept_grads = self._compute_loss_grad(
+        coef_grads, intercept_grads = self._compute_loss_grad_af(
             last, n_samples, activations, deltas, coef_grads, intercept_grads)
+
 
         # Iterate over the hidden layers
         for i in range(self.n_layers_ - 2, 0, -1):
-            deltas[i - 1] = safe_sparse_dot(deltas[i], self.coefs_[i].T)
+            #deltas[i - 1] = safe_sparse_dot(deltas[i], self.coefs_[i].T)
+            deltas[i - 1] = af.matmulNT(deltas[i], self.coefs_[i])
             inplace_derivative = DERIVATIVES[self.activation]
             inplace_derivative(activations[i], deltas[i - 1])
 
-            coef_grads, intercept_grads = self._compute_loss_grad(
+            coef_grads, intercept_grads = self._compute_loss_grad_af(
                 i - 1, n_samples, activations, deltas, coef_grads,
                 intercept_grads)
 
@@ -226,7 +357,7 @@ class BaseMultilayerPerceptron(afBaseEstimator, metaclass=ABCMeta):
         # Initialize parameters
         self.n_iter_ = 0
         self.t_ = 0
-        self.n_outputs_ = y.shape[1] if y.numdims() > 1 else 1
+        self.n_outputs_ = y.shape[1]
 
         # Compute the number of layers
         self.n_layers_ = len(layer_units)
@@ -246,8 +377,13 @@ class BaseMultilayerPerceptron(afBaseEstimator, metaclass=ABCMeta):
         self.intercepts_ = []
 
         for i in range(self.n_layers_ - 1):
-            coef_init, intercept_init = self._init_coef(layer_units[i],
-                                                        layer_units[i + 1])
+            if self.solver == 'lbfgs':
+                coef_init, intercept_init = self._init_coef(layer_units[i],
+                                                            layer_units[i + 1], make_af_array=False)
+            else:
+                coef_init, intercept_init = self._init_coef(layer_units[i],
+                                                            layer_units[i + 1], make_af_array=True)
+                                                            #layer_units[i + 1], make_af_array=False)
             self.coefs_.append(coef_init)
             self.intercepts_.append(intercept_init)
 
@@ -260,7 +396,7 @@ class BaseMultilayerPerceptron(afBaseEstimator, metaclass=ABCMeta):
             else:
                 self.best_loss_ = np.inf
 
-    def _init_coef(self, fan_in, fan_out):
+    def _init_coef(self, fan_in, fan_out, make_af_array=False):
         # Use the initialization method recommended by
         # Glorot et al.
         factor = 6.
@@ -269,8 +405,15 @@ class BaseMultilayerPerceptron(afBaseEstimator, metaclass=ABCMeta):
         init_bound = sqrt(factor / (fan_in + fan_out))
 
         # Generate weights and bias:
-        coef_init = (2 * init_bound) * af.randu(fan_in, fan_out) - init_bound
-        intercept_init = (2 * init_bound) * af.randu(fan_out) - init_bound
+        if make_af_array:
+            coef_init = (2 * init_bound) * af.randu(fan_in, fan_out) - init_bound
+            intercept_init = (2 * init_bound) * af.randu(fan_out) - init_bound
+        else:
+            # Generate weights and bias:
+            coef_init = self._random_state.uniform(-init_bound, init_bound,
+                                                  (fan_in, fan_out))
+            intercept_init = self._random_state.uniform(-init_bound, init_bound,
+                                                        fan_out)
 
         return coef_init, intercept_init
 
@@ -291,10 +434,10 @@ class BaseMultilayerPerceptron(afBaseEstimator, metaclass=ABCMeta):
         n_samples, n_features = X.shape
 
         # Ensure y is 2D
-        # if y.numdims() == 1:
-        # y = af.moddims(y, y.elements(), 1)
+        if y.ndim == 1:
+            y = y.reshape((-1, 1))
 
-        self.n_outputs_ = y.shape[1] if y.numdims() > 1 else 1
+        self.n_outputs_ = y.shape[1]
 
         layer_units = ([n_features] + hidden_layer_sizes +
                        [self.n_outputs_])
@@ -326,7 +469,7 @@ class BaseMultilayerPerceptron(afBaseEstimator, metaclass=ABCMeta):
                       n_fan_out_ in zip(layer_units[:-1],
                                         layer_units[1:])]
 
-        intercept_grads = [af.constant(0, n_fan_out_) for n_fan_out_ in
+        intercept_grads = [np.empty(n_fan_out_) for n_fan_out_ in
                            layer_units[1:]]
 
         # Run the Stochastic optimization solver
@@ -334,12 +477,12 @@ class BaseMultilayerPerceptron(afBaseEstimator, metaclass=ABCMeta):
             self._fit_stochastic(X, y, activations, deltas, coef_grads,
                                  intercept_grads, layer_units, incremental)
 
-#        # Run the LBFGS solver
-#        elif self.solver == 'lbfgs':
-#            self._fit_lbfgs(X, y, activations, deltas, coef_grads,
-#                            intercept_grads, layer_units)
-
+        # Run the LBFGS solver
+        elif self.solver == 'lbfgs':
+            self._fit_lbfgs(X, y, activations, deltas, coef_grads,
+                            intercept_grads, layer_units)
         return self
+
 
     def _validate_hyperparameters(self):
         if not isinstance(self.shuffle, bool):
@@ -393,52 +536,53 @@ class BaseMultilayerPerceptron(afBaseEstimator, metaclass=ABCMeta):
                              " Expected one of: %s" %
                              (self.solver, ", ".join(supported_solvers)))
 
-#    def _fit_lbfgs(self, X, y, activations, deltas, coef_grads,
-#                   intercept_grads, layer_units):
-#        # Store meta information for the parameters
-#        self._coef_indptr = []
-#        self._intercept_indptr = []
-#        start = 0
-#
-#        # Save sizes and indices of coefficients for faster unpacking
-#        for i in range(self.n_layers_ - 1):
-#            n_fan_in, n_fan_out = layer_units[i], layer_units[i + 1]
-#
-#            end = start + (n_fan_in * n_fan_out)
-#            self._coef_indptr.append((start, end, (n_fan_in, n_fan_out)))
-#            start = end
-#
-#        # Save sizes and indices of intercepts for faster unpacking
-#        for i in range(self.n_layers_ - 1):
-#            end = start + layer_units[i + 1]
-#            self._intercept_indptr.append((start, end))
-#            start = end
-#
-#        # Run LBFGS
-#        packed_coef_inter = _pack(self.coefs_,
-#                                  self.intercepts_)
-#
-#        if self.verbose is True or self.verbose >= 1:
-#            iprint = 1
-#        else:
-#            iprint = -1
-#
-#        opt_res = scipy.optimize.minimize(
-#                self._loss_grad_lbfgs, packed_coef_inter,
-#                method="L-BFGS-B", jac=True,
-#                options={
-#                    "maxfun": self.max_fun,
-#                    "maxiter": self.max_iter,
-#                    "iprint": iprint,
-#                    "gtol": self.tol
-#                },
-#                args=(X, y, activations, deltas, coef_grads, intercept_grads))
-#        self.n_iter_ = _check_optimize_result("lbfgs", opt_res, self.max_iter)
-#        self.loss_ = opt_res.fun
-#        self._unpack(opt_res.x)
-#
+    def _fit_lbfgs(self, X, y, activations, deltas, coef_grads,
+                   intercept_grads, layer_units):
+        # Store meta information for the parameters
+        self._coef_indptr = []
+        self._intercept_indptr = []
+        start = 0
+
+        # Save sizes and indices of coefficients for faster unpacking
+        for i in range(self.n_layers_ - 1):
+            n_fan_in, n_fan_out = layer_units[i], layer_units[i + 1]
+
+            end = start + (n_fan_in * n_fan_out)
+            self._coef_indptr.append((start, end, (n_fan_in, n_fan_out)))
+            start = end
+
+        # Save sizes and indices of intercepts for faster unpacking
+        for i in range(self.n_layers_ - 1):
+            end = start + layer_units[i + 1]
+            self._intercept_indptr.append((start, end))
+            start = end
+
+        # Run LBFGS
+        packed_coef_inter = _pack(self.coefs_,
+                                  self.intercepts_)
+
+        if self.verbose is True or self.verbose >= 1:
+            iprint = 1
+        else:
+            iprint = -1
+
+        opt_res = scipy.optimize.minimize(
+                self._loss_grad_lbfgs, packed_coef_inter,
+                method="L-BFGS-B", jac=True,
+                options={
+                    "maxfun": self.max_fun,
+                    "maxiter": self.max_iter,
+                    "iprint": iprint,
+                    "gtol": self.tol
+                },
+                args=(X, y, activations, deltas, coef_grads, intercept_grads))
+        self.n_iter_ = _check_optimize_result("lbfgs", opt_res, self.max_iter)
+        self.loss_ = opt_res.fun
+        self._unpack(opt_res.x)
+
     def _fit_stochastic(self, X, y, activations, deltas, coef_grads,
                         intercept_grads, layer_units, incremental):
+
         if not incremental or not hasattr(self, '_optimizer'):
             params = self.coefs_ + self.intercepts_
 
@@ -468,43 +612,45 @@ class BaseMultilayerPerceptron(afBaseEstimator, metaclass=ABCMeta):
             y_val = None
 
         n_samples = X.shape[0]
-        sample_idx = np.arange(n_samples, dtype=int)
 
         if self.batch_size == 'auto':
-            batch_size = min(4096, n_samples)
+            batch_size = min(200, n_samples)
         else:
             batch_size = np.clip(self.batch_size, 1, n_samples)
 
         try:
             for it in range(self.max_iter):
                 if self.shuffle:
-                    # Only shuffle the sample indices instead of X and y to
-                    # reduce the memory footprint. These indices will be used
-                    # to slice the X and y.
-                    sample_idx = shuffle(sample_idx,
-                                         random_state=self._random_state)
-
-                # sloooow loop
+                    X, y = shuffle(X, y, random_state=self._random_state)
                 accumulated_loss = 0.0
-                for batch_slice in gen_batches(n_samples, batch_size):
-                    if self.shuffle:
-                        X_batch = _safe_indexing(X, sample_idx[batch_slice])
-                        ii = af.interop.from_ndarray(sample_idx[batch_slice])
-                        y_batch = y[ii]
-                    else:
-                        X_batch = X[batch_slice]
-                        y_batch = y[batch_slice]
 
-                    activations[0] = X_batch
+                X_af = af.interop.from_ndarray(X)
+                y_af = af.interop.from_ndarray(y)
+
+                for batch_slice in gen_batches(n_samples, batch_size):
+                    #slow, 33ms
+                    #activations[0] = X[batch_slice]
+                    activations[0] = X_af[batch_slice]
                     batch_loss, coef_grads, intercept_grads = self._backprop(
-                        X_batch, y_batch, activations, deltas,
+                        X_af[batch_slice], y_af[batch_slice], activations, deltas,
                         coef_grads, intercept_grads)
                     accumulated_loss += batch_loss * (batch_slice.stop -
                                                       batch_slice.start)
-
+                    #TODO: conversion back to np should happen here
                     # update weights
+
+                    #coef_grads = [a.to_ndarray() if a is not None else a for a in coef_grads]
+                    #intercept_grads = [np.squeeze(a.to_ndarray()) if a is not None else a for a in intercept_grads]
                     grads = coef_grads + intercept_grads
+                    #slow, 16ms
                     self._optimizer.update_params(grads)
+
+                #propagate updates back from optimizer
+                #self.coefs_ = [a.to_ndarray() if a is not None else a for a in self.coefs_]
+                #self.intercepts_ = [np.squeeze(a.to_ndarray()) if a is not None else a for a in self.intercepts_]
+                ncoefs = len(self.coefs_)
+                self.coefs_ = self._optimizer.params[:ncoefs]
+                self.intercepts_ = self._optimizer.params[ncoefs:]
 
                 self.n_iter_ += 1
                 self.loss_ = accumulated_loss / X.shape[0]
@@ -549,7 +695,6 @@ class BaseMultilayerPerceptron(afBaseEstimator, metaclass=ABCMeta):
                         "Stochastic Optimizer: Maximum iterations (%d) "
                         "reached and the optimization hasn't converged yet."
                         % self.max_iter, ConvergenceWarning)
-
         except KeyboardInterrupt:
             warnings.warn("Training interrupted by user.")
 
@@ -602,7 +747,8 @@ class BaseMultilayerPerceptron(afBaseEstimator, metaclass=ABCMeta):
         -------
         self : returns a trained MLP model.
         """
-        return self._fit(X, y, incremental=False)
+        ret = self._fit(X, y, incremental=False)
+        return ret
 
     @property
     def partial_fit(self):

@@ -2,7 +2,7 @@ from math import log
 
 import numpy as np  # FIXME
 from scipy import linalg
-from sklearn.utils import _deprecate_positional_args
+from sklearn.utils.validation import _deprecate_positional_args
 
 from .._validation import _check_sample_weight
 from ..base import afRegressorMixin

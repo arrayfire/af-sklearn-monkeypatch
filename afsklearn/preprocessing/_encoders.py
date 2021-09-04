@@ -1,6 +1,6 @@
 import numpy as np  # FIXME
 from scipy import sparse
-from sklearn.utils import _deprecate_positional_args
+from sklearn.utils.validation import _deprecate_positional_args
 
 from .._encode import _check_unknown, _encode, _unique
 from .._validation import check_array, check_is_fitted, is_scalar_nan
