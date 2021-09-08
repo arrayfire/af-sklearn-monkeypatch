@@ -1,7 +1,6 @@
 import sklearn
 import sklearn.preprocessing
 import sklearn.random_projection
-import daal4py.sklearn
 import time
 import afsklearn
 import numpy as np
@@ -25,17 +24,6 @@ for n in range(nbench):
     X_new.shape
 toc = time.perf_counter()
 print(f"sklearn fit time {(toc - tic)/nbench:0.4f} seconds")
-
-#daal4py.sklearn.patch_sklearn()
-#tic = time.perf_counter()
-#for n in range(nbench):
-#    qt = sklearn.preprocessing.RobustScaler()
-#    qt.fit_transform(X)
-#toc = time.perf_counter()
-#print(f"daal4py sklearn fit time {(toc - tic)/nbench:0.4f} seconds")
-#
-#daal4py.sklearn.unpatch_sklearn()
-#
 
 Patcher.patch('gaussian_random_projection')
 tic = time.perf_counter()

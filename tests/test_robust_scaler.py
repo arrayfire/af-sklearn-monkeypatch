@@ -1,6 +1,5 @@
 import sklearn
 import sklearn.preprocessing
-import daal4py.sklearn
 import time
 import afsklearn
 import numpy as np
@@ -17,16 +16,6 @@ for n in range(nbench):
 toc = time.perf_counter()
 print(f"sklearn fit time {(toc - tic)/nbench:0.4f} seconds")
 
-#daal4py.sklearn.patch_sklearn()
-#tic = time.perf_counter()
-#for n in range(nbench):
-#    qt = sklearn.preprocessing.RobustScaler()
-#    qt.fit_transform(X)
-#toc = time.perf_counter()
-#print(f"daal4py sklearn fit time {(toc - tic)/nbench:0.4f} seconds")
-#
-#daal4py.sklearn.unpatch_sklearn()
-#
 #
 #afsklearn.patch_sklearn()
 #tic = time.perf_counter()

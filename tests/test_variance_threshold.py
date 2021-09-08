@@ -1,8 +1,11 @@
 from afsklearn.patcher import Patcher
 
-from . import measure_time
+from timing_utils import measure_time
+import numpy as np
 
-X = [[0, 2, 0, 3], [0, 1, 4, 3], [0, 1, 1, 3]]
+X = np.array([[0, 2, 0, 3], [0, 1, 4, 3], [0, 1, 1, 3]])
+X = np.tile(X, (10000, 100))
+print(X.shape)
 
 
 def sklearn_example() -> None:

@@ -2,7 +2,7 @@ import numpy as np
 
 from afsklearn.patcher import Patcher
 
-from . import measure_time
+from timing_utils import measure_time
 
 
 def sklearn_example() -> None:
@@ -26,5 +26,5 @@ def test_afsklearn() -> None:
 
 
 if __name__ == "__main__":
-    test_afsklearn()
     test_sklearn()
+    test_afsklearn()
