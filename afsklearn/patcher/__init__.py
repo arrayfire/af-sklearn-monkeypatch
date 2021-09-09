@@ -23,6 +23,7 @@ class Patcher:
     @staticmethod
     def patch_all():
         for p in patches_info:
+            print(f'[afsklearn]: Patching {p}')
             Patcher.patch(p)
 
     @staticmethod
