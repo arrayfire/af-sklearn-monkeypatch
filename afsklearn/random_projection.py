@@ -179,7 +179,7 @@ def _gaussian_random_matrix(n_components, n_features, random_state=None):
         #loc=0.0, scale=1.0 / np.sqrt(n_components), size=(n_components, n_features)
     #)
 
-    if random_state and not isinstance(random_state, np.RandomState):
+    if random_state and not isinstance(random_state, np.random.RandomState):
         af.random.set_seed(random_state)
     if random_state is None or random_state is np.random:
         pass #use default rng
@@ -212,7 +212,6 @@ class BaseRandomProjection(afTransformerMixin, afBaseEstimator, metaclass=ABCMet
         self.eps = eps
         self.dense_output = dense_output
         self.random_state = random_state
-        print("AF PROJECTION YO")
 
     @abstractmethod
     def _make_random_matrix(self, n_components, n_features):
@@ -296,10 +295,6 @@ class BaseRandomProjection(afTransformerMixin, afBaseEstimator, metaclass=ABCMet
             "An error has occurred the self.components_ matrix has "
             " not the proper shape."
         )
-        print('FIT')
-        print(t1 - t0)
-        print(t2 - t1)
-        print(t3 - t2)
         return self
 
     def transform(self, X):
@@ -332,9 +327,6 @@ class BaseRandomProjection(afTransformerMixin, afBaseEstimator, metaclass=ABCMet
         X_new = af.matmulNT(X_af, self.components_)
         X_new = X_new.to_ndarray()
         t2 = time.perf_counter()
-        print('TRANSFORM')
-        print(t1 - t0)
-        print(t2 - t1)
         return X_new
 
 
