@@ -119,7 +119,8 @@ class SGDOptimizer(BaseOptimizer):
 
         if params and isinstance(params[0], af.Array):
             dims_list = [paddims2(param.dims()) for param in params]
-            self.velocities_af = [af.constant(0, dim[0], dim[1]) for dim in dims_list]
+            ptype = params[0].dtype()
+            self.velocities_af = [af.constant(0, dim[0], dim[1], dtype=ptype) for dim in dims_list]
 
     def iteration_ends(self, time_step):
         """Perform updates to learning rate and potential other states at the
@@ -237,8 +238,8 @@ class AdamOptimizer(BaseOptimizer):
 
         if params and isinstance(params[0], af.Array):
             dims_list = [paddims2(param.dims()) for param in params]
-            self.ms_af = [af.constant(0, dim[0], dim[1]) for dim in dims_list]
-            self.vs_af = [af.constant(0, dim[0], dim[1]) for dim in dims_list]
+            self.ms_af = [af.constant(0, dim[0], dim[1], dtype=params[0].dtype()) for dim in dims_list]
+            self.vs_af = [af.constant(0, dim[0], dim[1], dtype=params[0].dtype()) for dim in dims_list]
         #self.ms_af = [ param.copy() for param in params]
         #self.vs_af = [ param.copy() for param in params]
         #for i in range(len(self.ms_af)):

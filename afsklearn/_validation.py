@@ -10,7 +10,7 @@ import numpy as np
 import scipy.sparse as sp
 from sklearn._config import get_config as _get_config
 from sklearn.exceptions import DataConversionWarning, NotFittedError
-from sklearn.utils.validation import _deprecate_positional_args
+from sklearn.utils.validation import _deprecate_positional_args, _check_large_sparse, _ensure_sparse_format
 
 from ._type_utils import typemap
 

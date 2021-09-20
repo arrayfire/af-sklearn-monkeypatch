@@ -123,7 +123,8 @@ def accuracy_score(y_true, y_pred, *, normalize=True, sample_weight=None):
     y_type, y_true, y_pred = _check_targets(y_true, y_pred)
     check_consistent_length(y_true, y_pred, sample_weight)
     if y_type.startswith('multilabel'):
-        differing_labels = count_nonzero(y_true - y_pred, axis=1)
+        diff =  (y_true - y_pred).todense()
+        differing_labels = count_nonzero(diff, axis=1)
         score = differing_labels == 0
     else:
         score = y_true == y_pred

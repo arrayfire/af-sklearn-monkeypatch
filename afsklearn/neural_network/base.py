@@ -5,6 +5,7 @@ from math import sqrt
 import arrayfire as af
 import numpy as np
 import scipy
+import scipy.sparse
 from sklearn.base import is_classifier
 from sklearn.exceptions import ConvergenceWarning
 from sklearn.model_selection import train_test_split
@@ -34,6 +35,11 @@ def af_type_matmulTN(a, b):
     return ret
 
 def cvtArgsaToAf(X, y, activations, deltas, coef_grads, intercept_grads):
+    if scipy.sparse.issparse(X):
+        X = X.todense()
+    if activations and scipy.sparse.issparse(activations[0]):
+        activations = [a.todense() if a is not None else a for a in activations]
+
     X_af = af.interop.from_ndarray(X)
     y_af = af.interop.from_ndarray(y)
 
@@ -119,17 +125,19 @@ class BaseMultilayerPerceptron(afBaseEstimator, metaclass=ABCMeta):
         # Iterate over the hidden layers
 
         if activations and not isinstance(activations[0], af.Array):
-            activations_af = [af.interop.from_ndarray(a)  if a is not None else a for a in activations]
+            activations_af = [af.interop.from_ndarray(a)  if isinstance(a, np.ndarray) else a for a in activations]
         else:
             activations_af = activations
 
         if self.coefs_ and not isinstance(self.coefs_[0], af.Array):
-            coefs_af = [af.interop.from_ndarray(c)  if c is not None else c for c in self.coefs_]
+            coefs_af = [af.interop.from_ndarray(c)  if isinstance(c, np.ndarray) else c for c in self.coefs_]
+            self.coefs_ = coefs_af
         else:
             coefs_af = self.coefs_
 
         if self.intercepts_ and not isinstance(self.intercepts_[0], af.Array):
-            intercepts_af = [af.interop.from_ndarray(i)  if i is not None else i for i in self.intercepts_]
+            intercepts_af = [af.interop.from_ndarray(i)  if isinstance(i, np.ndarray) else i for i in self.intercepts_]
+            self.intercepts_ = intercepts_af
         else:
             intercepts_af = self.intercepts_
 
@@ -149,8 +157,6 @@ class BaseMultilayerPerceptron(afBaseEstimator, metaclass=ABCMeta):
         output_activation = ACTIVATIONS[self.out_activation_]
         activations_af[i + 1] = output_activation(activations_af[i + 1])
 
-        #self.coefs_ = coefs_af
-        #self.intercepts_ = intercepts_af
 
         return activations_af
 
@@ -166,8 +172,8 @@ class BaseMultilayerPerceptron(afBaseEstimator, metaclass=ABCMeta):
         hidden_activation = ACTIVATIONS[self.activation]
         # Iterate over the hidden layers
         for i in range(self.n_layers_ - 1):
-            activations[i + 1] = safe_sparse_dot(activations[i],
-                                                 self.coefs_[i])
+            activations[i + 1]  = safe_sparse_dot(activations[i],
+                                                  self.coefs_[i])
             activations[i + 1] += af.tile(self.intercepts_[i].T, activations[i+1].shape[0])
 
             # For the hidden layers
@@ -416,6 +422,7 @@ class BaseMultilayerPerceptron(afBaseEstimator, metaclass=ABCMeta):
                                                         fan_out)
 
         return coef_init, intercept_init
+        #return coef_init.as_type(af.Dtype.f64), intercept_init.as_type(af.Dtype.f64)
 
     def _fit(self, X, y, incremental=False):
         # Make sure self.hidden_layer_sizes is a list
@@ -585,6 +592,9 @@ class BaseMultilayerPerceptron(afBaseEstimator, metaclass=ABCMeta):
 
         if not incremental or not hasattr(self, '_optimizer'):
             params = self.coefs_ + self.intercepts_
+
+            if incremental:
+                params = [af.interop.from_ndarray(p)  if isinstance(p, np.ndarray) else p for p in params]
 
             if self.solver == 'sgd':
                 self._optimizer = SGDOptimizer(
@@ -784,6 +794,8 @@ class BaseMultilayerPerceptron(afBaseEstimator, metaclass=ABCMeta):
             The decision function of the samples for each class in the model.
         """
         X = check_array(X, accept_sparse=['csr', 'csc'])
+        if scipy.sparse.issparse(X):
+            X = X.todense()
 
         # Make sure self.hidden_layer_sizes is a list
         hidden_layer_sizes = self.hidden_layer_sizes
@@ -803,7 +815,7 @@ class BaseMultilayerPerceptron(afBaseEstimator, metaclass=ABCMeta):
             activations.append(af.constant(0, X.shape[0], layer_units[i + 1]))
 
         # forward propagate
-        self._forward_pass(activations)
-        y_pred = activations[-1]
+        activations_af = self._forward_pass_af(activations)
+        y_pred = activations_af[-1].to_ndarray()
 
         return y_pred
