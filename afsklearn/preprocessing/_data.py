@@ -404,7 +404,7 @@ class QuantileTransformer(afTransformerMixin, afBaseEstimator):
             ires0 = np.interp(X_col_finite, quantiles, self.references_)
             # ires0_af = af.approx(X_col_finite, quantiles, self.references_)
             ires0_af = interp1_af(X_col_finite_af, quantiles_af, references_af)
-            print(np.max(ires0_af.to_ndarray() - ires0))
+            #print(np.max(ires0_af.to_ndarray() - ires0))
 
             X_col[isfinite_mask] = .5 * (
                 np.interp(X_col_finite, quantiles, self.references_)
