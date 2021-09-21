@@ -23,8 +23,10 @@ class Patcher:
     @staticmethod
     def patch_all():
         for p in patches_info:
-            print(f'[afsklearn]: Patching {p}')
-            Patcher.patch(p)
+            #TEMPORARY! whitelist for well tested classifiers TODO: remove, test all
+            if p == 'gaussian_random_projection' or p == 'mlp_classifier':
+                print(f'[afsklearn]: Patching {p}')
+                Patcher.patch(p)
 
     @staticmethod
     def rollback_all():
