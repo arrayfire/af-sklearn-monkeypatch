@@ -287,7 +287,8 @@ class BaseRandomProjection(afTransformerMixin, afBaseEstimator, metaclass=ABCMet
             t2 = time.perf_counter()
 
         # Generate a projection matrix of size [n_components, n_features]
-        self.components_ = self._make_random_matrix(self.n_components_, n_features)
+        self.components_af_ = self._make_random_matrix(self.n_components_, n_features)
+        self.components_ = self.components_af_.to_ndarray()
         t3 = time.perf_counter()
 
         # Check contract
@@ -311,23 +312,33 @@ class BaseRandomProjection(afTransformerMixin, afBaseEstimator, metaclass=ABCMet
 
         t0 = time.perf_counter()
         check_is_fitted(self)
+        self.check_external_components_modified()#[WARN] in d3m, primitives can "restore" private class variables...
         X = self._validate_data(X, accept_sparse=["csr", "csc"], reset=False)
         t1 = time.perf_counter()
 
-        if X.shape[1] != self.components_.shape[1]:
+        if X.shape[1] != self.components_af_.shape[1]:
             raise ValueError(
                 "Impossible to perform projection:"
                 "X at fit stage had a different number of features. "
-                "(%s != %s)" % (X.shape[1], self.components_.shape[1])
+                "(%s != %s)" % (X.shape[1], self.components_af_.shape[1])
             )
 
         #X_new = safe_sparse_dot(X, self.components_.T, dense_output=self.dense_output)
         #import pdb; pdb.set_trace()
-        X_af = af.interop.from_ndarray(X).as_type(self.components_.dtype())
-        X_new = af.matmulNT(X_af, self.components_)
+        X_af = af.interop.from_ndarray(X).as_type(self.components_af_.dtype())
+        X_new = af.matmulNT(X_af, self.components_af_)
         X_new = X_new.to_ndarray()
         t2 = time.perf_counter()
         return X_new
+
+    #TMP workaround for external private member modifications
+    def check_external_components_modified(self):
+        if not hasattr(self, 'components_af_'):
+            self.components_af_ = af.interop.from_ndarray(self.components_)
+
+        if self.components_.shape != self.components_af_.shape:
+            self.components_af_ = af.interop.from_ndarray(self.components_)
+
 
 
 class GaussianRandomProjection(BaseRandomProjection):
