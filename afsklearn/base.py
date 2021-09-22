@@ -1,15 +1,16 @@
-import numbers
-import warnings
+from collections.abc import Sequence
+from itertools import chain
 
 import arrayfire as af
 import numpy as np
 import scipy.sparse as sp
-from numpy.core.numeric import ComplexWarning
+from scipy.sparse.base import spmatrix
 from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.preprocessing import LabelBinarizer
+from sklearn.utils.validation import _deprecate_positional_args
 
-from ._validation import (
-    _assert_all_finite, _ensure_no_complex_data, _num_samples, _safe_accumulator_op, check_array,
-    check_consistent_length, check_X_y, column_or_1d)
+from ._sparsefuncs import min_max_axis
+from ._validation import _assert_all_finite, _num_samples, check_array, check_is_fitted, check_X_y, column_or_1d
 
 
 # Class inheriting from BaseEstimator
@@ -40,22 +41,64 @@ class afBaseEstimator(BaseEstimator):
         row_ind, col_ind = self.get_indices(i)
         return data[row_ind[:, np.newaxis], col_ind]
 
-    def _validate_data(self, X, y=None, reset=True,
+    def _check_n_features(self, X, reset):
+        """Set the `n_features_in_` attribute, or check against it.
+        Parameters
+        ----------
+        X : {ndarray, sparse matrix} of shape (n_samples, n_features)
+            The input samples.
+        reset : bool
+            If True, the `n_features_in_` attribute is set to `X.shape[1]`.
+            If False and the attribute exists, then check that it is equal to
+            `X.shape[1]`. If False and the attribute does *not* exist, then
+            the check is skipped.
+            .. note::
+               It is recommended to call reset=True in `fit` and in the first
+               call to `partial_fit`. All other methods that validate `X`
+               should set `reset=False`.
+        """
+        n_features = X.shape[1]
+
+        if reset:
+            self.n_features_in_ = n_features
+            return
+
+        if not hasattr(self, "n_features_in_"):
+            # Skip this check if the expected number of expected input features
+            # was not recorded by calling fit first. This is typically the case
+            # for stateless transformers.
+            return
+
+        if n_features != self.n_features_in_:
+            raise ValueError(
+                f"X has {n_features} features, but {self.__class__.__name__} "
+                f"is expecting {self.n_features_in_} features as input.")
+
+    def _validate_data(self, X, y='no_validation', reset=True,
                        validate_separately=False, **check_params):
         """Validate input data and set or check the `n_features_in_` attribute.
-
         Parameters
         ----------
         X : {array-like, sparse matrix, dataframe} of shape \
                 (n_samples, n_features)
             The input samples.
-        y : array-like of shape (n_samples,), default=None
-            The targets. If None, `check_array` is called on `X` and
-            `check_X_y` is called otherwise.
+        y : array-like of shape (n_samples,), default='no_validation'
+            The targets.
+            - If `None`, `check_array` is called on `X`. If the estimator's
+              requires_y tag is True, then an error will be raised.
+            - If `'no_validation'`, `check_array` is called on `X` and the
+              estimator's requires_y tag is ignored. This is a default
+              placeholder and is never meant to be explicitly set.
+            - Otherwise, both `X` and `y` are checked with either `check_array`
+              or `check_X_y` depending on `validate_separately`.
         reset : bool, default=True
             Whether to reset the `n_features_in_` attribute.
             If False, the input will be checked for consistency with data
             provided when reset was last True.
+            .. note::
+               It is recommended to call reset=True in `fit` and in the first
+               call to `partial_fit`. All other methods that validate `X`
+               should set `reset=False`.
         validate_separately : False or tuple of dicts, default=False
             Only used if y is not None.
             If False, call validate_X_y(). Else, it must be a tuple of kwargs
@@ -64,7 +107,6 @@ class afBaseEstimator(BaseEstimator):
             Parameters passed to :func:`sklearn.utils.check_array` or
             :func:`sklearn.utils.check_X_y`. Ignored if validate_separately
             is not False.
-
         Returns
         -------
         out : {ndarray, sparse matrix} or tuple of these
@@ -77,6 +119,9 @@ class afBaseEstimator(BaseEstimator):
                     f"This {self.__class__.__name__} estimator "
                     f"requires y to be passed, but the target y is None."
                 )
+            X = check_array(X, **check_params)
+            out = X
+        elif isinstance(y, str) and y == 'no_validation':
             X = check_array(X, **check_params)
             out = X
         else:
@@ -97,27 +142,14 @@ class afBaseEstimator(BaseEstimator):
 
         return out
 
+
 # Class inheriting from TransformerMixin
 # all methods that touch np.array are replaced
 # with ArrayFire compatible functionality
+
+
 class afTransformerMixin(TransformerMixin):
     pass
-
-import numbers
-import warnings
-from collections.abc import Sequence
-from itertools import chain
-
-import arrayfire as af
-#import numpy as np
-import numpy
-import numpy as np
-import scipy.sparse as sp
-from scipy.sparse.base import spmatrix
-from sklearn.preprocessing import LabelBinarizer
-from sklearn.utils.validation import _deprecate_positional_args
-
-from ._validation import _num_samples, check_array, check_is_fitted, column_or_1d
 
 
 def _unique_multiclass(y):
@@ -138,6 +170,7 @@ _FN_UNIQUE_LABELS = {
     'multiclass': _unique_multiclass,
     'multilabel-indicator': _unique_indicator,
 }
+
 
 def unique_labels(*ys):
     """Extract an ordered array of unique labels
@@ -196,7 +229,6 @@ def unique_labels(*ys):
     if not _unique_labels:
         raise ValueError("Unknown label type: %s" % repr(ys))
 
-    #ys_labels = set(chain.from_iterable(_unique_labels(y.tolist()) for y in ys))
     ys_labels = set(chain.from_iterable(_unique_labels(y.tolist()) for y in ys))
 
     # Check that we don't mix string type with number type
@@ -204,6 +236,7 @@ def unique_labels(*ys):
         raise ValueError("Mix of label input types (string and number)")
 
     return np.array(sorted(ys_labels))
+
 
 def is_multilabel(y):
     """ Check if ``y`` is in a multilabel format.
@@ -238,8 +271,8 @@ def is_multilabel(y):
     if not (hasattr(y, "shape") and y.ndim == 2 and y.shape[1] > 1):
         return False
 
-    if issparse(y):
-        if isinstance(y, (dok_matrix, lil_matrix)):
+    if sp.issparse(y):
+        if isinstance(y, (sp.dok_matrix, sp.lil_matrix)):
             y = y.tocsr()
         return (len(y.data) == 0 or np.unique(y.data).size == 1 and
                 (y.dtype.kind in 'biu' or  # bool, int, uint
@@ -249,6 +282,11 @@ def is_multilabel(y):
 
         return len(labels) < 3 and (y.dtype.kind in 'biu' or  # bool, int, uint
                                     _is_integral_float(labels))
+
+
+def _is_integral_float(y):
+    return y.dtype.kind == "f" and np.all(y.astype(int) == y)
+
 
 def type_of_target(y):
     """Determine the type of data indicated by the target.
@@ -370,6 +408,7 @@ def type_of_target(y):
     else:
         return 'binary'  # [1, 2] or [["a"], ["b"]]
 
+
 def _inverse_binarize_multiclass(y, classes):
     """Inverse label binarization transformation for multiclass.
 
@@ -459,11 +498,12 @@ def _inverse_binarize_thresholding(y, output_type, classes, threshold):
 
 
 def af_in1d(arr0, arr1):
-    #temporarily perform computation in numy, potentially change to arrayfire
-    #a0 = arr0.to_ndarray()
-    #a1 = arr1.to_ndarray()
+    # temporarily perform computation in numy, potentially change to arrayfire
+    # a0 = arr0.to_ndarray()
+    # a1 = arr1.to_ndarray()
     isin = np.in1d(arr0,  arr1)
     return isin
+
 
 @_deprecate_positional_args
 def label_binarize(y, *, classes, neg_label=0, pos_label=1,
@@ -586,16 +626,16 @@ def label_binarize(y, *, classes, neg_label=0, pos_label=1,
         y_in_classes = af.interop.from_ndarray(y_in_classes, copy=True)
         y[y_in_classes]
         y_seen = y[y_in_classes]
-        y_seen = y_seen#.to_ndarray()
+        y_seen = y_seen  # .to_ndarray()
         indices = np.searchsorted(sorted_class, y_seen)
-        indptr = np.hstack((0, np.cumsum(y_in_classes)))
+        indptr = np.hstack((0, np.cumsum(y_in_classes)))  # FIXME
 
         data = np.empty_like(indices)
         data.fill(pos_label)
         Y = data
 
-        #Y = sp.csr_matrix((data, indices, indptr),
-                          #shape=(n_samples, n_classes))
+        # Y = sp.csr_matrix((data, indices, indptr),
+        # shape=(n_samples, n_classes))
     elif y_type == "multilabel-indicator":
         Y = sp.csr_matrix(y)
         if pos_label != 1:
@@ -607,7 +647,7 @@ def label_binarize(y, *, classes, neg_label=0, pos_label=1,
                          "binarization" % y_type)
 
     if not sparse_output:
-        #Y = Y.toarray() #TODO: test if ndarray, then cast if not
+        # Y = Y.toarray() #TODO: test if ndarray, then cast if not
         Y = Y.astype(int, copy=False)
 
         if neg_label != 0:
@@ -739,5 +779,53 @@ class afLabelBinarizer(LabelBinarizer):
         elif sp.issparse(y_inv):
             y_inv = y_inv.toarray()
 
-        af_yinv = af.from_ndarray(y_inv)
+        #af_yinv = af.from_ndarray(y_inv)
         return af_yinv
+
+
+class afRegressorMixin:
+    """Mixin class for all regression estimators in scikit-learn."""
+    _estimator_type = "regressor"
+
+    def score(self, X, y, sample_weight=None):
+        """Return the coefficient of determination :math:`R^2` of the
+        prediction.
+        The coefficient :math:`R^2` is defined as :math:`(1 - \\frac{u}{v})`,
+        where :math:`u` is the residual sum of squares ``((y_true - y_pred)
+        ** 2).sum()`` and :math:`v` is the total sum of squares ``((y_true -
+        y_true.mean()) ** 2).sum()``. The best possible score is 1.0 and it
+        can be negative (because the model can be arbitrarily worse). A
+        constant model that always predicts the expected value of `y`,
+        disregarding the input features, would get a :math:`R^2` score of
+        0.0.
+        Parameters
+        ----------
+        X : array-like of shape (n_samples, n_features)
+            Test samples. For some estimators this may be a precomputed
+            kernel matrix or a list of generic objects instead with shape
+            ``(n_samples, n_samples_fitted)``, where ``n_samples_fitted``
+            is the number of samples used in the fitting for the estimator.
+        y : array-like of shape (n_samples,) or (n_samples, n_outputs)
+            True values for `X`.
+        sample_weight : array-like of shape (n_samples,), default=None
+            Sample weights.
+        Returns
+        -------
+        score : float
+            :math:`R^2` of ``self.predict(X)`` wrt. `y`.
+        Notes
+        -----
+        The :math:`R^2` score used when calling ``score`` on a regressor uses
+        ``multioutput='uniform_average'`` from version 0.23 to keep consistent
+        with default value of :func:`~sklearn.metrics.r2_score`.
+        This influences the ``score`` method of all the multioutput
+        regressors (except for
+        :class:`~sklearn.multioutput.MultiOutputRegressor`).
+        """
+
+        from sklearn.metrics import r2_score
+        y_pred = self.predict(X)
+        return r2_score(y, y_pred, sample_weight=sample_weight)
+
+    def _more_tags(self):
+        return {'requires_y': True}

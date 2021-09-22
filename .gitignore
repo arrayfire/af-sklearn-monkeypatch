@@ -1,5 +1,13 @@
 # Python cache
 __pycache__/
 
+# Build
+build
+dist
+*.egg-info
+
+# Static typing
+.mypy_cache
+
 # Virtual env
 venv

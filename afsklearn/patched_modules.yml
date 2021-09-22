@@ -2,3 +2,38 @@ mlp_classifier:
   name: MLPClassifier
   module: sklearn.neural_network
   module_patch: afsklearn.neural_network.mlp_classifier
+
+quantile_transformer:
+  name: QuantileTransformer
+  module: sklearn.preprocessing
+  module_patch: afsklearn.preprocessing._data
+
+simple_imputer:
+  name: SimpleImputer
+  module: sklearn.impute
+  module_patch: afsklearn.impute.simple
+
+iterative_imputer:
+  name: IterativeImputer
+  module: sklearn.impute._iterative
+  module_patch: afsklearn.impute.iterative
+
+sgd_classifier:
+  name: SGDClassifier
+  module: sklearn.linear_model
+  module_patch: afsklearn.linear_model.sgd_classifier
+
+one_hot_encoder:
+  name: OneHotEncoder
+  module: sklearn.preprocessing
+  module_patch: afsklearn.preprocessing._encoders
+
+variance_threshold:
+  name: VarianceThreshold
+  module: sklearn.feature_selection
+  module_patch: afsklearn.feature_selection.variance_threshold
+
+gaussian_random_projection:
+  name: GaussianRandomProjection
+  module: sklearn.random_projection
+  module_patch: afsklearn.random_projection

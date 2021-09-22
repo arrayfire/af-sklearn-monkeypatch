@@ -4,19 +4,17 @@
 # License: BSD 3 clause
 
 import arrayfire as af
-#import numpy as np
 import numpy as np
-import numpy
+from scipy.special import xlogy
+
 from ._type_utils import typemap
 
 
 def logistic_sigmoid(x):
-    # return 1 / (1 + af.exp(-x))
+    if isinstance(x, af.Array):
+        return 1 / (1 + af.exp(-x))
+
     return 1 / (1 + np.exp(-x))
-
-
-def xlogy(x, y):
-    return x * af.log(af.to_array(y))
 
 
 def identity(X):
@@ -59,6 +57,8 @@ def tanh(X):
     X_new : {array-like, sparse matrix}, shape (n_samples, n_features)
         The transformed data.
     """
+    if isinstance(X, af.Array):
+        return af.tanh(X)
     return np.tanh(X, out=X)
 
 
@@ -73,7 +73,7 @@ def relu(X):
     X_new : {array-like, sparse matrix}, shape (n_samples, n_features)
         The transformed data.
     """
-    #np.clip(X, 0, np.finfo(X.dtype).max, out=X)
+    # np.clip(X, 0, np.finfo(X.dtype).max, out=X)
     ii = (X < 0)
     if len(ii) > 0:
         X[ii] = 0
@@ -91,10 +91,12 @@ def softmax(X):
     X_new : {array-like, sparse matrix}, shape (n_samples, n_features)
         The transformed data.
     """
-    tmp = X - af.max(X, dim=1)
+    #tmp = X - af.max(X, dim=1)
+    #X = af.exp(tmp)
+    #X /= af.sum(X, dim=1)
+    tmp = X - af.tile(af.max(X, dim=1), 1, X.shape[1])
     X = af.exp(tmp)
-    X /= af.sum(X, dim=1)
-
+    X /= af.tile(af.sum(X, dim=1), 1, X.shape[1])
     return X
 
 
@@ -182,6 +184,13 @@ def squared_loss(y_true, y_pred):
     """
     return af.mean(af.flat((y_true - y_pred) ** 2)) / 2
 
+def xlogy_af(x, y):
+    nullmask = x == 0
+    xly = x * af.log(y)
+    xly[nullmask] = 0;
+    return xly
+
+    #return x * af.log(af.to_array(y))
 
 def log_loss(y_true, y_prob):
     """Compute Logistic loss for classification.
@@ -197,27 +206,28 @@ def log_loss(y_true, y_prob):
     loss : float
         The degree to which the samples are correctly predicted.
     """
-#    eps = np.finfo(y_prob.dtype).eps
-#    y_prob = np.clip(y_prob, eps, 1 - eps)
-#    if y_prob.shape[1] == 1:
-#        y_prob = np.append(1 - y_prob, y_prob, axis=1)
-#
-#    if y_true.shape[1] == 1:
-#        y_true = np.append(1 - y_true, y_true, axis=1)
-#
-#    return - xlogy(y_true, y_prob).sum() / y_prob.shape[0]
+    if isinstance(y_true, af.Array):
+        eps = np.finfo(typemap(y_prob.dtype())).eps
+        y_prob[y_prob < eps] = eps
+        y_prob[y_prob > (1.0 - eps)] = 1.0 - eps
 
-    eps = numpy.finfo(typemap(y_prob.dtype())).eps
-    y_prob[y_prob < eps] = eps
-    y_prob[y_prob > (1.0 - eps)] = 1.0 - eps
+        if y_prob.numdims() == 1:
+            y_prob = af.join(1, (1.0 - y_prob).as_type(y_prob.dtype()), y_prob)
 
-    if y_prob.numdims() == 1:
-        y_prob = af.join(1, (1.0 - y_prob).as_type(y_prob.dtype()), y_prob)
+        if y_true.numdims() == 1:
+            y_true = af.join(1, (1.0 - y_true).as_type(y_true.dtype()), y_true)
 
-    if y_true.numdims() == 1:
-        y_true = af.join(1, (1.0 - y_true).as_type(y_true.dtype()), y_true)
+        return -af.sum(af.flat(xlogy_af(y_true, y_prob))) / y_prob.shape[0]
 
-    return - af.sum(af.flat(xlogy(y_true, y_prob))) / y_prob.shape[0]
+    eps = np.finfo(y_prob.dtype).eps
+    y_prob = np.clip(y_prob, eps, 1 - eps)
+    if y_prob.shape[1] == 1:
+        y_prob = np.append(1 - y_prob, y_prob, axis=1)
+
+    if y_true.shape[1] == 1:
+        y_true = np.append(1 - y_true, y_true, axis=1)
+
+    return -xlogy(y_true, y_prob).sum() / y_prob.shape[0]
 
 
 def binary_log_loss(y_true, y_prob):
@@ -236,9 +246,22 @@ def binary_log_loss(y_true, y_prob):
     loss : float
         The degree to which the samples are correctly predicted.
     """
+    if isinstance(y_true, af.Array):
+        eps = np.finfo(typemap(y_prob.dtype())).eps
+        y_prob[y_prob < eps] = eps
+        y_prob[y_prob > (1.0 - eps)] = 1.0 - eps
+
+        return (
+            -(af.sum(xlogy_af(y_true, y_prob)) + af.sum(xlogy_af(1 - y_true, 1 - y_prob)))
+            / y_prob.shape[0]
+            )
+
     eps = np.finfo(y_prob.dtype).eps
     y_prob = np.clip(y_prob, eps, 1 - eps)
-    return af.sum(-(xlogy(y_true, y_prob) + xlogy(1 - y_true, 1 - y_prob))) / y_prob.shape[0]
+    return (
+        -(xlogy(y_true, y_prob).sum() + xlogy(1 - y_true, 1 - y_prob).sum())
+        / y_prob.shape[0]
+        )
 
 
 LOSS_FUNCTIONS = {'squared_loss': squared_loss, 'log_loss': log_loss,

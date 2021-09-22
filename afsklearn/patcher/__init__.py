@@ -20,11 +20,19 @@ class Patcher:
         patch_config = patches_info[module_name]
         _apply_patch(patch_config["module"], patch_config["name"], None)
 
+    @staticmethod
     def patch_all():
-        raise NotImplemented
+        for p in patches_info:
+            #TEMPORARY! whitelist for well tested classifiers TODO: remove, test all
+            if p == 'gaussian_random_projection' or p == 'mlp_classifier':
+                print(f'[afsklearn]: Patching {p}')
+                Patcher.patch(p)
 
+    @staticmethod
     def rollback_all():
-        raise NotImplemented
+        for p in patches_info:
+            if p in temporary_storage:
+                Patcher.rollback(p)
 
 
 def _load_module(module_path: str) -> Any:

@@ -1,5 +1,5 @@
-from functools import wraps
 import time
+from functools import wraps
 
 def measure_time(func):
     @wraps(func)

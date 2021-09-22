@@ -1,11 +1,16 @@
 import arrayfire as af
 import numpy as np
-
-from ..base import afLabelBinarizer
-from .base import BaseMultilayerPerceptron
-from .._classifier_mixin import afClassifierMixin
-
 from sklearn.utils.validation import _deprecate_positional_args
+
+from .._classifier_mixin import afClassifierMixin
+from .._validation import check_is_fitted, column_or_1d, check_X_y
+from sklearn.utils.multiclass import _check_partial_fit_first_call, unique_labels
+from sklearn.utils.multiclass import type_of_target
+from ..base import afLabelBinarizer, unique_labels
+from sklearn.preprocessing import LabelBinarizer
+from .base import BaseMultilayerPerceptron
+
+_STOCHASTIC_SOLVERS = ['sgd', 'adam']
 
 class MLPClassifier(afClassifierMixin, BaseMultilayerPerceptron):
     """Multi-layer Perceptron classifier.
@@ -208,13 +213,39 @@ class MLPClassifier(afClassifierMixin, BaseMultilayerPerceptron):
             validation_fraction=validation_fraction,
             beta_1=beta_1, beta_2=beta_2, epsilon=epsilon,
             n_iter_no_change=n_iter_no_change, max_fun=max_fun)
-        print("done init")
 
     def _validate_input(self, X, y, incremental):
+        X, y = check_X_y(X, y, accept_sparse=['csr', 'csc', 'coo'],
+                         multi_output=True)
+        if y.ndim == 2 and y.shape[1] == 1:
+            y = column_or_1d(y, warn=True)
+
+        if not incremental:
+            self._label_binarizer = LabelBinarizer()
+            self._label_binarizer.fit(y)
+            self.classes_ = self._label_binarizer.classes_
+        elif self.warm_start:
+            classes = unique_labels(y)
+            if set(classes) != set(self.classes_):
+                raise ValueError("warm_start can only be used where `y` has "
+                                 "the same classes as in the previous "
+                                 "call to fit. Previously got %s, `y` has %s" %
+                                 (self.classes_, classes))
+        else:
+            classes = unique_labels(y)
+            if len(np.setdiff1d(classes, self.classes_, assume_unique=True)):
+                raise ValueError("`y` has classes not in `self.classes_`."
+                                 " `self.classes_` has %s. 'y' has %s." %
+                                 (self.classes_, classes))
+
+        y = self._label_binarizer.transform(y)
+        return X, y
+
+    def _validate_input_af(self, X, y, incremental):
         X, y = self._validate_data(X, y, accept_sparse=['csr', 'csc'],
                                    multi_output=True)
         # if y.ndim == 2 and y.shape[1] == 1:
-        #y = column_or_1d(y, warn=True)
+        # y = column_or_1d(y, warn=True)
         if y.ndim == 2 and y.dims(1) == 1:
             y = column_or_1d(y, warn=True)
 
@@ -254,9 +285,9 @@ class MLPClassifier(afClassifierMixin, BaseMultilayerPerceptron):
         y_pred = self._predict(X)
 
         if self.n_outputs_ == 1:
-            y_pred = af.flat(y_pred)
+            y_pred = y_pred.ravel()
 
-        return self._label_binarizer.inverse_transform(y_pred)
+        return self._label_binarizer.inverse_transform(y_pred)#TODO: use afLabelBinarizer
 
     def fit(self, X, y):
         """Fit the model to data matrix X and target(s) y.
@@ -273,3 +304,88 @@ class MLPClassifier(afClassifierMixin, BaseMultilayerPerceptron):
         """
         return self._fit(X, y, incremental=(self.warm_start and
                                             hasattr(self, "classes_")))
+
+    @property
+    def partial_fit(self):
+        """Update the model with a single iteration over the given data.
+
+        Parameters
+        ----------
+        X : {array-like, sparse matrix}, shape (n_samples, n_features)
+            The input data.
+
+        y : array-like, shape (n_samples,)
+            The target values.
+
+        classes : array, shape (n_classes), default None
+            Classes across all calls to partial_fit.
+            Can be obtained via `np.unique(y_all)`, where y_all is the
+            target vector of the entire dataset.
+            This argument is required for the first call to partial_fit
+            and can be omitted in the subsequent calls.
+            Note that y doesn't need to contain all labels in `classes`.
+
+        Returns
+        -------
+        self : returns a trained MLP model.
+        """
+        if self.solver not in _STOCHASTIC_SOLVERS:
+            raise AttributeError("partial_fit is only available for stochastic"
+                                 " optimizer. %s is not stochastic"
+                                 % self.solver)
+        return self._partial_fit
+
+    def _partial_fit(self, X, y, classes=None):
+        if _check_partial_fit_first_call(self, classes):
+            self._label_binarizer = LabelBinarizer()
+            if type_of_target(y).startswith('multilabel'):
+                self._label_binarizer.fit(y)
+            else:
+                self._label_binarizer.fit(classes)
+
+        super()._partial_fit(X, y)
+
+        return self
+
+    def predict_log_proba(self, X):
+        """Return the log of probability estimates.
+
+        Parameters
+        ----------
+        X : ndarray of shape (n_samples, n_features)
+            The input data.
+
+        Returns
+        -------
+        log_y_prob : ndarray of shape (n_samples, n_classes)
+            The predicted log-probability of the sample for each class
+            in the model, where classes are ordered as they are in
+            `self.classes_`. Equivalent to log(predict_proba(X))
+        """
+        y_prob = self.predict_proba(X)
+        return np.log(y_prob, out=y_prob)
+
+    def predict_proba(self, X):
+        """Probability estimates.
+
+        Parameters
+        ----------
+        X : {array-like, sparse matrix} of shape (n_samples, n_features)
+            The input data.
+
+        Returns
+        -------
+        y_prob : ndarray of shape (n_samples, n_classes)
+            The predicted probability of the sample for each class in the
+            model, where classes are ordered as they are in `self.classes_`.
+        """
+        check_is_fitted(self)
+        y_pred = self._predict(X)
+
+        if self.n_outputs_ == 1:
+            y_pred = y_pred.ravel()
+
+        if y_pred.ndim == 1:
+            return np.vstack([1 - y_pred, y_pred]).T
+        else:
+            return y_pred
