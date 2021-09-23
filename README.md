@@ -23,12 +23,23 @@ Patcher.patch_all() # patches scikit-learn with all accelerated classifiers
 # sklearn functions here
 Patcher.rollback_all() #returns sklearn package to default state w/o arrayfire
 ```
-In the case that no code modification is desired, the [autowrapt](https://github.com/syurkevi/autowrapt) package can be used to globally and automatically replace sklearn during python's import. After installing the linked autowrapt package, set the `AUTOWRAPT_BOOTSTRAP=afsklearn` environment variable to enable the import hooks.
+In the case that no code modification is desired, see installation instructions below for the [Autowrapt](https://github.com/syurkevi/autowrapt) package.
 
 ## Installation
 
 ```console
 pip install -r requirements.txt
+```
+The [Autowrapt](https://github.com/syurkevi/autowrapt) package can be used to globally and automatically replace sklearn during python's import. After installing the linked autowrapt package, set the `AUTOWRAPT_BOOTSTRAP=afsklearn` environment variable to enable the import hooks.
+
+If packaging the af-sklearn-monkeypatch into a docker image of a larger system such as AutoML(https://gitlab.com/sray/cmu-ta2) or [AlphaD3M](https://gitlab.com/ViDA-NYU/d3m/alphad3m) the following commands can be added to the Dockerfile to include the required dependencies and permannently enable the patch:
+```
+RUN pip3 install arrayfire==3.8.0+cu102 -f https://repo.arrayfire.com/python/wheels/3.8.0/
+
+RUN pip3 install git+https://github.com/syurkevi/af-sklearn-monkeypatch && \
+    pip3 install git+https://github.com/syurkevi/autowrapt.git
+
+ENV AUTOWRAPT_BOOTSTRAP=afsklearn
 ```
 
 ## Tests
