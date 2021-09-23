@@ -1,6 +1,6 @@
 # ArrayFire SKlearn MonkeyPatch
 
-MonkeyPatch sklearn with ArrayFire accelerated variants. Tested classifiers match sklearn interface and pass sklearn tests. Currently targeting scikit-learn 0.22.
+MonkeyPatch scikit-learn with ArrayFire accelerated variants. Tested classifiers match sklearn interface and pass sklearn tests. Currently targeting scikit-learn 0.22.
 Patching sklearn components can be done explicitly with the Patcher class as follows:
 ```
 import sklearn
@@ -36,7 +36,7 @@ If packaging the af-sklearn-monkeypatch into a docker image of a larger system s
 ```
 RUN pip3 install arrayfire==3.8.0+cu102 -f https://repo.arrayfire.com/python/wheels/3.8.0/
 
-RUN pip3 install git+https://github.com/syurkevi/af-sklearn-monkeypatch && \
+RUN pip3 install git+https://github.com/arrayfire/af-sklearn-monkeypatch && \
     pip3 install git+https://github.com/syurkevi/autowrapt.git
 
 ENV AUTOWRAPT_BOOTSTRAP=afsklearn
